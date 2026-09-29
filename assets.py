@@ -115,6 +115,8 @@ class SpriteLibrary:
             return self.security_bot(direction, "chase" in lower, size)
         if lower.startswith("hunter_"):
             return self.hunter_x("attack" in lower, size)
+        if lower.startswith("warden_prime"):
+            return self.warden_prime(size=size)
         if lower.startswith("cctv_"):
             direction = next((d for d in ("down", "up", "left", "right") if d in lower), "down")
             return self.cctv(direction, False, size)
@@ -241,6 +243,59 @@ class SpriteLibrary:
         pygame.draw.circle(surface, arm_color, (cx + 19, cy + 3), 8)
         pygame.draw.line(surface, YELLOW if alerted else (211, 103, 43), (cx - 18, cy + 7), (cx - 23, cy + 17), 3)
         pygame.draw.line(surface, YELLOW if alerted else (211, 103, 43), (cx + 18, cy + 7), (cx + 23, cy + 17), 3)
+        return surface
+
+    def warden_prime(
+        self,
+        *,
+        shielded: bool = True,
+        damaged: bool = False,
+        defeated: bool = False,
+        size: int | tuple[int, int] | None = None,
+    ) -> pygame.Surface:
+        """Draw the armored WARDEN PRIME chassis and its shield state."""
+
+        dimensions = self._size(size)
+        surface = pygame.Surface(dimensions, pygame.SRCALPHA)
+        cx, cy = dimensions[0] // 2, dimensions[1] // 2
+        scale = max(1, min(dimensions) // 18)
+
+        pygame.draw.ellipse(
+            surface,
+            (0, 0, 0, 105),
+            (cx - 27, cy + 19, 54, 12),
+        )
+        body_color = (50, 52, 65) if defeated else (99, 42, 68) if damaged else (66, 58, 84)
+        edge_color = (77, 90, 101) if defeated else (220, 67, 91)
+        body = pygame.Rect(cx - 23, cy - 18, 46, 43)
+        pygame.draw.rect(surface, body_color, body, border_radius=10)
+        pygame.draw.rect(surface, edge_color, body, 3, border_radius=10)
+
+        for side in (-1, 1):
+            shoulder = (cx + side * 28, cy - 4)
+            pygame.draw.circle(surface, (45, 43, 55), shoulder, 11)
+            pygame.draw.circle(surface, edge_color, shoulder, 2)
+            pygame.draw.line(
+                surface,
+                (103, 74, 88),
+                shoulder,
+                (cx + side * 31, cy + 19),
+                max(3, scale),
+            )
+
+        visor = pygame.Rect(cx - 18, cy - 11, 36, 10)
+        pygame.draw.rect(surface, (20, 8, 18), visor, border_radius=4)
+        core_color = STEEL if defeated else YELLOW if shielded else RED
+        pygame.draw.circle(surface, core_color, visor.center, 5)
+        pygame.draw.circle(surface, WHITE, visor.center, 2)
+        pygame.draw.circle(surface, core_color, (cx, cy + 11), 7, 2)
+
+        if shielded and not defeated:
+            radius = min(dimensions) // 2 - 3
+            pygame.draw.circle(surface, (*CYAN[:3], 85), (cx, cy), radius, 3)
+            for angle in range(0, 360, 60):
+                point = pygame.Vector2(radius - 1, 0).rotate(angle) + (cx, cy)
+                pygame.draw.circle(surface, CYAN, point, 2)
         return surface
 
     def cctv(

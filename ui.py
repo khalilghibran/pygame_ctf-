@@ -128,6 +128,7 @@ class UI:
         alarm_level: int = 0,
         level_label: str = "LAB A-1",
         terminal_hacked: bool | None = None,
+        terminal_progress: tuple[int, int] | None = None,
         dash_active: bool = False,
     ) -> None:
         left = pygame.Rect(28, 18, 410, 82)
@@ -153,7 +154,12 @@ class UI:
         self.text(surface, "OBJECTIVE", (472, 30), size=14, color=YELLOW, bold=True)
         key_text = "KEY: ACQUIRED" if has_keycard else "KEY: MISSING"
         if terminal_hacked is not None:
-            key_text += "  //  NET: OFFLINE" if terminal_hacked else "  //  NET: LOCKED"
+            if terminal_hacked:
+                key_text += "  //  NET: OFFLINE"
+            elif terminal_progress is not None:
+                key_text += f"  //  NET: {terminal_progress[0]}/{terminal_progress[1]}"
+            else:
+                key_text += "  //  NET: LOCKED"
         self.text(surface, key_text, (963, 30), size=12, color=BLUE if has_keycard else STEEL, anchor="topright")
         self.text(surface, objective, (472, 58), size=17, color=WHITE, bold=True)
 
@@ -189,12 +195,13 @@ class UI:
         surface.blit(glow, glow.get_rect(center=(self.width // 2, title_y + 40)))
         self.text(surface, "ROBOT LAB ESCAPE", (self.width // 2, title_y), size=54, color=WHITE, bold=True, anchor="midtop")
         self.text(surface, "SNEAK. SOLVE. POWER UP. ESCAPE.", (self.width // 2, title_y + 72), size=20, color=CYAN, bold=True, anchor="midtop")
-        box = pygame.Rect(0, 0, 560, 146)
-        box.center = (self.width // 2, self.height // 2 + 88)
+        box = pygame.Rect(0, 0, 680, 188)
+        box.center = (self.width // 2, self.height // 2 + 94)
         self.panel(surface, box, border=CYAN)
-        self.text(surface, "ENTER  START MISSION", (box.centerx, box.y + 27), size=23, color=CYAN, bold=True, anchor="midtop")
-        self.text(surface, "1  WAKE PROTOCOL    2  THE LAST SIGNAL", (box.centerx, box.y + 68), size=15, color=YELLOW, anchor="midtop")
-        self.text(surface, "WASD / ARROWS  Move    E  Interact    SPACE  EMP", (box.centerx, box.y + 102), size=14, color=LIGHT, anchor="midtop")
+        self.text(surface, "ENTER  START CAMPAIGN", (box.centerx, box.y + 20), size=23, color=CYAN, bold=True, anchor="midtop")
+        self.text(surface, "1  WAKE PROTOCOL       2  THE LAST SIGNAL", (box.centerx, box.y + 58), size=15, color=YELLOW, anchor="midtop")
+        self.text(surface, "3  THE SLEEPING LINE   4  BREAK THE CYCLE", (box.centerx, box.y + 86), size=15, color=YELLOW, anchor="midtop")
+        self.text(surface, "WASD / ARROWS  Move    E  Interact    SPACE  EMP", (box.centerx, box.y + 128), size=14, color=LIGHT, anchor="midtop")
         self.text(surface, "SHIFT  Dash    ESC  Pause    F11  Fullscreen    Q  Quit", (self.width // 2, self.height - 31), size=14, color=STEEL, anchor="midbottom")
 
     def draw_briefing(self, surface: pygame.Surface, story: object) -> None:

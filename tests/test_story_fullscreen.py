@@ -41,12 +41,15 @@ class StoryAndFullscreenTests(unittest.TestCase):
         self.game._handle_events()
 
     def test_every_level_has_complete_story_data(self) -> None:
-        self.assertEqual(len(MISSION_STORIES), 2)
+        self.assertEqual(len(MISSION_STORIES), 4)
         for story in MISSION_STORIES:
             self.assertTrue(story.chapter)
             self.assertTrue(story.title)
             self.assertTrue(story.story_lines)
             self.assertTrue(story.mission_lines)
+            self.assertTrue(story.key_objective)
+            self.assertTrue(story.exit_objective)
+            self.assertTrue(story.network_clear_message)
             self.assertTrue(story.clear_lines)
 
     def test_menu_selection_shows_matching_briefing_before_play(self) -> None:
@@ -63,6 +66,16 @@ class StoryAndFullscreenTests(unittest.TestCase):
         self.assertEqual(self.game.scene, Scene.BRIEFING)
         self.assertEqual(self.game.level_index, 1)
 
+        self.game.scene = Scene.MENU
+        self.press(pygame.K_3, unicode="3")
+        self.assertEqual(self.game.scene, Scene.BRIEFING)
+        self.assertEqual(self.game.level_index, 2)
+
+        self.game.scene = Scene.MENU
+        self.press(pygame.K_KP4, unicode="")
+        self.assertEqual(self.game.scene, Scene.BRIEFING)
+        self.assertEqual(self.game.level_index, 3)
+
     def test_chapter_one_completion_routes_to_chapter_two_story(self) -> None:
         self.game._load_level(0)
         self.game.scene = Scene.WON
@@ -72,8 +85,23 @@ class StoryAndFullscreenTests(unittest.TestCase):
         self.assertEqual(self.game.level_index, 1)
         self.assertEqual(self.game.scene, Scene.BRIEFING)
 
+    def test_campaign_completion_advances_through_all_four_chapters(self) -> None:
+        for index in range(3):
+            with self.subTest(level=index):
+                self.game._load_level(index)
+                self.game.scene = Scene.WON
+                self.press(pygame.K_RETURN, unicode="\r")
+                self.assertEqual(self.game.level_index, index + 1)
+                self.assertEqual(self.game.scene, Scene.BRIEFING)
+
+        self.game._load_level(3)
+        self.game.scene = Scene.WON
+        self.press(pygame.K_RETURN, unicode="\r")
+        self.assertEqual(self.game.level_index, 3)
+        self.assertEqual(self.game.scene, Scene.PLAYING)
+
     def test_briefings_and_both_endings_render_headlessly(self) -> None:
-        for index in range(2):
+        for index in range(len(MISSION_STORIES)):
             with self.subTest(level=index):
                 self.game._begin_mission(index)
                 self.game._draw()
@@ -82,7 +110,7 @@ class StoryAndFullscreenTests(unittest.TestCase):
                 self.assertEqual(self.game.screen.get_size(), settings.SCREEN_SIZE)
 
     def test_fullscreen_toggle_preserves_current_mission_state(self) -> None:
-        self.game._load_level(1)
+        self.game._load_level(3)
         self.game.player.give_keycard()
         self.game.elapsed = 12.5
         scene = self.game.scene
@@ -92,7 +120,7 @@ class StoryAndFullscreenTests(unittest.TestCase):
         self.assertTrue(self.game.fullscreen)
         self.assertEqual(self.game.screen.get_size(), settings.SCREEN_SIZE)
         self.assertEqual(self.game.scene, scene)
-        self.assertEqual(self.game.level_index, 1)
+        self.assertEqual(self.game.level_index, 3)
         self.assertTrue(self.game.player.has_keycard())
         self.assertEqual(self.game.elapsed, 12.5)
 

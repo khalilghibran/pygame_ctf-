@@ -1,0 +1,23 @@
+########################
+#P...#....B.#.C.......X#
+#.E..#......#...#..T...#
+#....#####..#...#......#
+#........#..D...#....C.#
+#........#..#...#####..#
+#.####...#..#.H..E.....#
+#..M......K.#.#####.T..#
+#...........#..........#
+########################
+
+Legend:
+# wall
+P player start
+B battery pack
+D locked blue-keycard door
+E security bot
+K relay keycard
+X quarantine lift
+T quarantine relay terminal
+C CCTV camera
+M EMP charge
+H Hunter-X spawn

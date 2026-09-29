@@ -28,6 +28,7 @@ TERMINAL = "T"
 CAMERA = "C"
 EMP = "M"
 HUNTER = "H"
+BOSS = "W"
 
 ALLOWED_TILES = frozenset(
     {
@@ -43,6 +44,7 @@ ALLOWED_TILES = frozenset(
         CAMERA,
         EMP,
         HUNTER,
+        BOSS,
     }
 )
 SPECIAL_TILES = (
@@ -56,6 +58,7 @@ SPECIAL_TILES = (
     CAMERA,
     EMP,
     HUNTER,
+    BOSS,
 )
 
 
@@ -218,6 +221,10 @@ class TileMap:
     @property
     def hunter_spawns(self) -> tuple[GridPosition, ...]:
         return self._positions[HUNTER]
+
+    @property
+    def boss_spawns(self) -> tuple[GridPosition, ...]:
+        return self._positions[BOSS]
 
     @property
     def door_positions(self) -> tuple[GridPosition, ...]:

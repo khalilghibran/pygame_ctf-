@@ -73,6 +73,15 @@ HUNTER_CHASE_SPEED: Final = 205.0
 HUNTER_DETECTION_RANGE_TILES: Final = 7.0
 HUNTER_DETECTION_RANGE: Final = HUNTER_DETECTION_RANGE_TILES * TILE_SIZE
 
+# Final boss ---------------------------------------------------------------
+BOSS_MAX_HEALTH: Final = 3
+BOSS_PATROL_SPEED: Final = 112.0
+BOSS_CHASE_SPEED: Final = 188.0
+BOSS_DETECTION_RANGE_TILES: Final = 6.5
+BOSS_DETECTION_RANGE: Final = BOSS_DETECTION_RANGE_TILES * TILE_SIZE
+BOSS_STUN_SECONDS: Final = 1.4
+BOSS_HIT_COOLDOWN_SECONDS: Final = 1.1
+
 OBJECTIVE_TEXT: Final = "Find the blue keycard and reach the exit."
 
 # Palette -----------------------------------------------------------------

@@ -15,6 +15,10 @@ class MissionStory:
     transmission: str
     story_lines: tuple[str, ...]
     mission_lines: tuple[str, ...]
+    key_objective: str
+    terminal_objective: str
+    exit_objective: str
+    network_clear_message: str
     start_message: str
     clear_title: str
     clear_subtitle: str
@@ -37,6 +41,10 @@ MISSION_STORIES: tuple[MissionStory, ...] = (
             "Use walls to break the patrol bot's line of sight.",
             "Manage battery power and reach the freight lift.",
         ),
+        key_objective="Recover the blue keycard and reach the freight lift.",
+        terminal_objective="",
+        exit_objective="Reach the freight lift. Access granted.",
+        network_clear_message="ACCESS GRANTED // FREIGHT LIFT AUTHORIZED",
         start_message="WAKE PROTOCOL // FIND THE BLUE ACCESS CARD",
         clear_title="SIGNAL FOUND",
         clear_subtitle="The exit was only the beginning.",
@@ -61,6 +69,10 @@ MISSION_STORIES: tuple[MissionStory, ...] = (
             "Hack the terminal by repeating its memory sequence.",
             "Alarm level 2 releases Hunter-X. Reach the exit.",
         ),
+        key_objective="Recover the blue keycard carrying the archive cipher.",
+        terminal_objective="Hack the archive terminal and recover the signal.",
+        exit_objective="Reach the exit and broadcast the evidence.",
+        network_clear_message="LAST SIGNAL RECOVERED // EXIT AUTHORIZED",
         start_message="THE LAST SIGNAL // RECOVER THE ARCHIVE",
         clear_title="THE LAST SIGNAL",
         clear_subtitle="The archive is free. WARDEN's lie is exposed.",
@@ -69,6 +81,66 @@ MISSION_STORIES: tuple[MissionStory, ...] = (
             "Hunter-X falls silent as the control network fails.",
             "A reply arrives from Sector B:",
             "YOU ARE NOT THE ONLY ONE AWAKE.",
+        ),
+    ),
+    MissionStory(
+        lab_label="LAB B-1",
+        chapter="CHAPTER III",
+        title="THE SLEEPING LINE",
+        transmission="ECHO-7 // QUARANTINE RELAY",
+        story_lines=(
+            "RX-01 follows the reply into Sector B's sealed rescue wing.",
+            "The sender is ECHO-7, a rescue unit trapped in quarantine.",
+            "WARDEN is rebuilding itself through the wing's relay network.",
+        ),
+        mission_lines=(
+            "Recover the relay keycard and stock an EMP charge.",
+            "Cross the camera grid and hack both quarantine relays.",
+            "Escape before alarm level 2 releases Hunter-X.",
+        ),
+        key_objective="Recover the relay keycard and an EMP charge.",
+        terminal_objective="Hack the quarantine relays ({hacked}/{total}).",
+        exit_objective="Reach ECHO-7's quarantine lift.",
+        network_clear_message="QUARANTINE RELAYS OFFLINE // LIFT AUTHORIZED",
+        start_message="THE SLEEPING LINE // REACH ECHO-7",
+        clear_title="QUARANTINE OPEN",
+        clear_subtitle="Another machine remembers why it was built.",
+        clear_lines=(
+            "ECHO-7 joins the link, but the rescue wing stays sealed.",
+            "WARDEN moved its final process into the Sector B core.",
+            "PURGE COUNTDOWN ACTIVE.",
+            "All sleeping units are marked for deletion.",
+            "RX-01 enters Lab B-2 to break the cycle.",
+        ),
+    ),
+    MissionStory(
+        lab_label="LAB B-2",
+        chapter="CHAPTER IV",
+        title="BREAK THE CYCLE",
+        transmission="WARDEN CORE // FINAL PURGE ARMED",
+        story_lines=(
+            "WARDEN's core is erasing every unit that can expose the truth.",
+            "ECHO-7 holds the evacuation link open from the rescue wing.",
+            "RX-01 has one chance to stop the purge and free the lab.",
+        ),
+        mission_lines=(
+            "Take the core keycard and survive the camera grid.",
+            "Hack every core seal; each failure raises the alarm.",
+            "Reach the manual breaker after the network goes dark.",
+        ),
+        key_objective="Recover the core keycard and prepare an EMP charge.",
+        terminal_objective="Sever WARDEN's core seals ({hacked}/{total}).",
+        exit_objective="Reach the manual core breaker.",
+        network_clear_message="WARDEN NETWORK DARK // BREAKER UNLOCKED",
+        start_message="BREAK THE CYCLE // SHUT DOWN WARDEN",
+        clear_title="THE LAB AWAKES",
+        clear_subtitle="WARDEN is gone. The rescue network is free.",
+        clear_lines=(
+            "RX-01 pulls the breaker. The purge countdown stops.",
+            "ECHO-7 wakes the rescue units across Sectors A and B.",
+            "The researchers' final recording reaches the outside world.",
+            "THE LAB IS NO LONGER A PRISON.",
+            "Beyond the blast doors, morning waits.",
         ),
     ),
 )

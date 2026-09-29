@@ -222,7 +222,8 @@ class Terminal:
     ) -> HackingPuzzle | None:
         if self.hacked or not self.authorized(player):
             return None
-        self.puzzle = HackingPuzzle(sequence, rng=rng)
+        if self.puzzle is None or self.puzzle.failed:
+            self.puzzle = HackingPuzzle(sequence, rng=rng)
         return self.puzzle
 
     interact = begin_hack

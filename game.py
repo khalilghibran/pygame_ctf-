@@ -28,8 +28,13 @@ ROOT = Path(__file__).resolve().parent
 LEVEL_PATHS = (
     ROOT / "levels" / "level_01.txt",
     ROOT / "levels" / "level_02.txt",
+    ROOT / "levels" / "level_03.txt",
+    ROOT / "levels" / "level_04.txt",
 )
 LEVEL_PATH = LEVEL_PATHS[0]
+
+if len(LEVEL_PATHS) != len(MISSION_STORIES):
+    raise RuntimeError("every campaign level must have matching story data")
 
 
 class Scene(str, Enum):
@@ -238,7 +243,10 @@ class Game:
 
         self.elapsed = 0.0
         self.security_events = 0
-        self.last_security_state = EnemyState.PATROL
+        self.last_enemy_states = [bot.state for bot in self.enemies]
+        self.last_security_state = (
+            self.enemy.state if self.enemies else EnemyState.PATROL
+        )
         self.alarm_level = 0
         self.active_terminal: Terminal | None = None
         self.hacking_puzzle: HackingPuzzle | None = None
@@ -247,9 +255,9 @@ class Game:
         self.emp_effect_remaining = 0.0
         self.emp_effect_center = self.player.position.copy()
         self.scene = Scene.PLAYING
-        lab = self.level_index + 1
+        lab_label = MISSION_STORIES[self.level_index].lab_label
         self.ui.toast.show(
-            f"LAB A-{lab} ONLINE // LOCATE BLUE ACCESS CARD", CYAN, 2.8
+            f"{lab_label} ONLINE // LOCATE BLUE ACCESS CARD", CYAN, 2.8
         )
 
     @property
@@ -272,15 +280,16 @@ class Game:
 
     @property
     def objective(self) -> str:
+        story = MISSION_STORIES[self.level_index]
         if not self.player.has_keycard("blue"):
-            if self.level_index == 1:
-                return "Recover the blue keycard carrying the archive cipher."
-            return "Recover the blue keycard and reach the freight lift."
+            return story.key_objective
         if self.terminals and not self.terminal_hacked:
-            return "Hack the archive terminal and recover the last signal."
-        if self.player.has_keycard("blue"):
-            return "Reach the exit and broadcast the evidence."
-        return settings.OBJECTIVE_TEXT
+            hacked = sum(terminal.hacked for terminal in self.terminals)
+            return story.terminal_objective.format(
+                hacked=hacked,
+                total=len(self.terminals),
+            )
+        return story.exit_objective
 
     @property
     def terminal_hacked(self) -> bool:
@@ -288,14 +297,19 @@ class Game:
 
     @property
     def security_state_name(self) -> str:
-        active_hunter = next((hunter for hunter in self.hunters if hunter.active), None)
-        if active_hunter is not None and active_hunter.state_name in {
-            "CHASE",
-            "SEARCH",
-            "DISABLED",
-        }:
-            return f"X:{active_hunter.state_name}"
-        return self.enemy.state_name if self.enemies else "CLEAR"
+        active_hunters = [hunter for hunter in self.hunters if hunter.active]
+        for state_name in ("CHASE", "SEARCH", "DISABLED", "RETURN", "PATROL"):
+            if any(hunter.state_name == state_name for hunter in active_hunters):
+                return f"X:{state_name}"
+        for state in (
+            EnemyState.CHASE,
+            EnemyState.SEARCH,
+            EnemyState.RETURN,
+            EnemyState.PATROL,
+        ):
+            if any(bot.state is state for bot in self.enemies):
+                return state.value
+        return "CLEAR"
 
     def run(self, *, max_frames: int | None = None) -> None:
         """Run until quit; ``max_frames`` supports deterministic smoke tests."""
@@ -348,10 +362,14 @@ class Game:
                         self._begin_mission(self.level_index + 1)
                     else:
                         self._reset_world()
-            elif event.key == pygame.K_1 and self.scene is Scene.MENU:
+            elif event.key in (pygame.K_1, pygame.K_KP1) and self.scene is Scene.MENU:
                 self._begin_mission(0)
-            elif event.key == pygame.K_2 and self.scene is Scene.MENU:
+            elif event.key in (pygame.K_2, pygame.K_KP2) and self.scene is Scene.MENU:
                 self._begin_mission(1)
+            elif event.key in (pygame.K_3, pygame.K_KP3) and self.scene is Scene.MENU:
+                self._begin_mission(2)
+            elif event.key in (pygame.K_4, pygame.K_KP4) and self.scene is Scene.MENU:
+                self._begin_mission(3)
             elif event.key == pygame.K_SPACE and self.scene is Scene.BRIEFING:
                 self._leave_briefing()
             elif event.key == pygame.K_r and self.scene is not Scene.MENU:
@@ -409,11 +427,20 @@ class Game:
         if result is True:
             if self.active_terminal is not None:
                 self.active_terminal.mark_hacked()
-            for camera in self.cameras:
-                camera.disable_permanently()
-            self.alarm_level = 0
             self.scene = Scene.PLAYING
-            self.ui.toast.show("LAST SIGNAL RECOVERED // EXIT AUTHORIZED", GREEN, 2.5)
+            hacked = sum(terminal.hacked for terminal in self.terminals)
+            total = len(self.terminals)
+            if self.terminal_hacked:
+                for camera in self.cameras:
+                    camera.disable_permanently()
+                for hunter in self.hunters:
+                    hunter.deactivate()
+                self.alarm_level = 0
+                message = MISSION_STORIES[self.level_index].network_clear_message
+            else:
+                self.alarm_level = max(0, self.alarm_level - 1)
+                message = f"NETWORK NODE {hacked}/{total} OFFLINE // CONTINUE"
+            self.ui.toast.show(message, GREEN, 2.5)
             self.active_terminal = None
             self.hacking_puzzle = None
         elif puzzle.attempts_remaining < attempts_before:
@@ -485,6 +512,7 @@ class Game:
                 self._raise_alarm(1, self.player.position, "CCTV LOCK")
 
         opened = self.opened_door_tiles
+        previous_enemy_states = tuple(self.last_enemy_states)
         for bot in self.enemies:
             bot.update(
                 dt,
@@ -511,12 +539,23 @@ class Game:
                 self.scene = Scene.CAUGHT
                 return
 
-        if self.enemies and self.enemy.state is EnemyState.CHASE and self.last_security_state is not EnemyState.CHASE:
+        current_enemy_states = tuple(bot.state for bot in self.enemies)
+        chase_started = any(
+            state is EnemyState.CHASE
+            and (index >= len(previous_enemy_states) or previous_enemy_states[index] is not EnemyState.CHASE)
+            for index, state in enumerate(current_enemy_states)
+        )
+        chase_ended = (
+            any(state is EnemyState.CHASE for state in previous_enemy_states)
+            and not any(state is EnemyState.CHASE for state in current_enemy_states)
+        )
+        if chase_started:
             self.security_events += 1
             self.campaign_detections += 1
             self._raise_alarm(1, self.player.position, "SECURITY BREACH")
-        elif self.enemies and self.enemy.state is EnemyState.PATROL and self.last_security_state is not EnemyState.PATROL:
+        elif chase_ended:
             self.ui.toast.show("SECURITY SWEEP ENDED", GREEN, 1.5)
+        self.last_enemy_states = [bot.state for bot in self.enemies]
         if self.enemies:
             self.last_security_state = self.enemy.state
 
@@ -592,7 +631,7 @@ class Game:
             return "[E]  COLLECT EMP CHARGE"
         if isinstance(target, Terminal):
             if target.hacked:
-                return "[E]  SECURITY NETWORK OFFLINE"
+                return "[E]  TERMINAL NODE OFFLINE"
             if not self.player.has_keycard():
                 return "[E]  TERMINAL REQUIRES BLUE KEYCARD"
             return "[E]  HACK SECURITY TERMINAL"
@@ -632,7 +671,7 @@ class Game:
             return
         if isinstance(target, Terminal):
             if target.hacked:
-                self.ui.toast.show("SECURITY NETWORK ALREADY OFFLINE", GREEN, 1.4)
+                self.ui.toast.show("TERMINAL NODE ALREADY OFFLINE", GREEN, 1.4)
                 return
             puzzle = target.begin_hack(
                 self.player,
@@ -891,8 +930,14 @@ class Game:
             prompt=prompt,
             emp_charges=self.player.emp_charges,
             alarm_level=self.alarm_level,
-            level_label=f"LAB A-{self.level_index + 1}",
+            level_label=MISSION_STORIES[self.level_index].lab_label,
             terminal_hacked=self.terminal_hacked if self.terminals else None,
+            terminal_progress=(
+                sum(terminal.hacked for terminal in self.terminals),
+                len(self.terminals),
+            )
+            if self.terminals
+            else None,
             dash_active=self.dash_active,
         )
 
@@ -919,7 +964,7 @@ class Game:
             has_next = self.level_index + 1 < len(LEVEL_PATHS)
             story = MISSION_STORIES[self.level_index]
             action = (
-                "ENTER  Continue to Chapter II     R  Retry"
+                f"ENTER  Continue to {MISSION_STORIES[self.level_index + 1].chapter}     R  Retry"
                 if has_next
                 else "ENTER / R  Run again     Q  Quit"
             )

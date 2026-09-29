@@ -1,0 +1,23 @@
+########################
+#P..#.B.#...#.C.#...C..#
+#...#...#E..#...#..T...#
+#.E.###.#...#...D......#
+#.....C.#...#...#.####.#
+#.####..#.###.B.#.H..C.#
+#.......D....T..#.###..#
+#.M...K.#.H...M.#E..T..#
+#.......#.......#.....X#
+########################
+
+Legend:
+# wall
+P player start
+B battery pack
+D locked blue-keycard door
+E security bot
+K core keycard
+X manual core breaker
+T WARDEN core-seal terminal
+C CCTV camera
+M EMP charge
+H Hunter-X spawn
