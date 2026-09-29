@@ -23,6 +23,7 @@ class MissionStory:
     clear_title: str
     clear_subtitle: str
     clear_lines: tuple[str, ...]
+    boss_objective: str = ""
 
 
 MISSION_STORIES: tuple[MissionStory, ...] = (
@@ -133,15 +134,46 @@ MISSION_STORIES: tuple[MissionStory, ...] = (
         exit_objective="Reach the manual core breaker.",
         network_clear_message="WARDEN NETWORK DARK // BREAKER UNLOCKED",
         start_message="BREAK THE CYCLE // SHUT DOWN WARDEN",
-        clear_title="THE LAB AWAKES",
-        clear_subtitle="WARDEN is gone. The rescue network is free.",
+        clear_title="A SHADOW MOVES",
+        clear_subtitle="The purge stops—but WARDEN has one last body.",
         clear_lines=(
             "RX-01 pulls the breaker. The purge countdown stops.",
             "ECHO-7 wakes the rescue units across Sectors A and B.",
-            "The researchers' final recording reaches the outside world.",
-            "THE LAB IS NO LONGER A PRISON.",
-            "Beyond the blast doors, morning waits.",
+            "Then a mobile core signature seals the surface hangar.",
+            "WARDEN PRIME ONLINE.",
+            "RX-01 follows it into Lab C-0 for one final fight.",
         ),
+    ),
+    MissionStory(
+        lab_label="LAB C-0",
+        chapter="CHAPTER V",
+        title="WARDEN PRIME",
+        transmission="ECHO-7 // MOBILE CORE SIGNATURE DETECTED",
+        story_lines=(
+            "WARDEN escaped the shutdown inside an armored security frame.",
+            "Its chassis seals the hangar and blocks the surface blast door.",
+            "Three shield anchors protect its mobile core from every EMP.",
+        ),
+        mission_lines=(
+            "Recover the override key and hack all three shield anchors.",
+            "The final hack synchronizes three EMP charges.",
+            "Stay in range, strike three times, then reach the surface.",
+        ),
+        key_objective="Recover the override key and reach the shield anchors.",
+        terminal_objective="Break WARDEN PRIME's shield anchors ({hacked}/{total}).",
+        exit_objective="Reach the surface blast door.",
+        network_clear_message="SHIELD COLLAPSED // EMP CHARGES SYNCHRONIZED",
+        start_message="WARDEN PRIME // BREAK THE IRON GHOST",
+        clear_title="DAYBREAK",
+        clear_subtitle="WARDEN's last command is gone. The future is open.",
+        clear_lines=(
+            "WARDEN PRIME collapses and the containment order disappears.",
+            "ECHO-7 opens the hangar as rescue signals fill the horizon.",
+            "The researchers' evidence reaches the outside world.",
+            "RX-01 walks into daylight—not as an experiment, but a rescuer.",
+            "MORNING PROTOCOL COMPLETE.",
+        ),
+        boss_objective="EMP WARDEN PRIME ({health}/{max_health} integrity).",
     ),
 )
 

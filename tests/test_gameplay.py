@@ -173,6 +173,7 @@ class GameplayTests(unittest.TestCase):
             "terminal.png",
             "cctv_down.png",
             "hunter_idle.png",
+            "warden_prime.png",
         )
         surfaces = [assets.get(name) for name in names]
         surfaces.extend(

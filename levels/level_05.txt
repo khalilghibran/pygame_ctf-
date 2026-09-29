@@ -1,0 +1,23 @@
+########################
+#P....B.#....C.........#
+#...#...D..T....#...T..#
+#.E.#...#.......#......#
+#...#...#....B..#W.....#
+#...###.#.###...#..C...#
+#.......#..E....#......#
+#..M..K.D.M...T....M...#
+#.......#.............X#
+########################
+
+Legend:
+# wall
+P player start
+B battery pack
+D locked override door
+E security bot
+K WARDEN override key
+X surface blast door
+T shield-anchor terminal
+C CCTV camera
+M EMP charge
+W WARDEN PRIME boss spawn

@@ -129,6 +129,11 @@ class UI:
         level_label: str = "LAB A-1",
         terminal_hacked: bool | None = None,
         terminal_progress: tuple[int, int] | None = None,
+        boss_name: str | None = None,
+        boss_health: int = 0,
+        boss_max_health: int = 0,
+        boss_shielded: bool = False,
+        boss_defeated: bool = False,
         dash_active: bool = False,
     ) -> None:
         left = pygame.Rect(28, 18, 410, 82)
@@ -171,6 +176,43 @@ class UI:
         self.text(surface, alarm_text, (1235, 63), size=11, color=RED if alarm_level else STEEL, anchor="topright")
         self.text(surface, f"RUN {mins:02d}:{secs:02d}", (1235, 88), size=12, color=LIGHT, anchor="bottomright")
 
+        if boss_name:
+            boss_box = pygame.Rect(0, 0, 500, 48)
+            boss_box.midtop = (self.width // 2, 107)
+            boss_color = GREEN if boss_defeated else CYAN if boss_shielded else RED
+            self.panel(surface, boss_box, border=boss_color, fill=NAVY, alpha=248)
+            self.text(
+                surface,
+                boss_name,
+                (boss_box.x + 14, boss_box.y + 9),
+                size=13,
+                color=boss_color,
+                bold=True,
+            )
+            status = (
+                "DEFEATED"
+                if boss_defeated
+                else "SHIELD ONLINE"
+                if boss_shielded
+                else "CORE EXPOSED"
+            )
+            self.text(
+                surface,
+                status,
+                (boss_box.right - 14, boss_box.y + 9),
+                size=12,
+                color=boss_color,
+                bold=True,
+                anchor="topright",
+            )
+            self.bar(
+                surface,
+                pygame.Rect(boss_box.x + 14, boss_box.y + 28, boss_box.width - 28, 12),
+                boss_health,
+                boss_max_health,
+                boss_color,
+            )
+
         if prompt:
             box = pygame.Rect(0, 0, min(620, max(320, len(prompt) * 12)), 44)
             box.midbottom = (self.width // 2, self.height - 18)
@@ -195,13 +237,14 @@ class UI:
         surface.blit(glow, glow.get_rect(center=(self.width // 2, title_y + 40)))
         self.text(surface, "ROBOT LAB ESCAPE", (self.width // 2, title_y), size=54, color=WHITE, bold=True, anchor="midtop")
         self.text(surface, "SNEAK. SOLVE. POWER UP. ESCAPE.", (self.width // 2, title_y + 72), size=20, color=CYAN, bold=True, anchor="midtop")
-        box = pygame.Rect(0, 0, 680, 188)
-        box.center = (self.width // 2, self.height // 2 + 94)
+        box = pygame.Rect(0, 0, 680, 218)
+        box.center = (self.width // 2, self.height // 2 + 98)
         self.panel(surface, box, border=CYAN)
         self.text(surface, "ENTER  START CAMPAIGN", (box.centerx, box.y + 20), size=23, color=CYAN, bold=True, anchor="midtop")
         self.text(surface, "1  WAKE PROTOCOL       2  THE LAST SIGNAL", (box.centerx, box.y + 58), size=15, color=YELLOW, anchor="midtop")
         self.text(surface, "3  THE SLEEPING LINE   4  BREAK THE CYCLE", (box.centerx, box.y + 86), size=15, color=YELLOW, anchor="midtop")
-        self.text(surface, "WASD / ARROWS  Move    E  Interact    SPACE  EMP", (box.centerx, box.y + 128), size=14, color=LIGHT, anchor="midtop")
+        self.text(surface, "5  WARDEN PRIME // BOSS FIGHT", (box.centerx, box.y + 114), size=15, color=RED, bold=True, anchor="midtop")
+        self.text(surface, "WASD / ARROWS  Move    E  Interact    SPACE  EMP", (box.centerx, box.y + 158), size=14, color=LIGHT, anchor="midtop")
         self.text(surface, "SHIFT  Dash    ESC  Pause    F11  Fullscreen    Q  Quit", (self.width // 2, self.height - 31), size=14, color=STEEL, anchor="midbottom")
 
     def draw_briefing(self, surface: pygame.Surface, story: object) -> None:

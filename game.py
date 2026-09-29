@@ -12,6 +12,7 @@ import pygame
 
 import settings
 from assets import SpriteLibrary
+from boss import BossHit, WardenPrime
 from door import Door, Exit
 from enemy import EnemyState, SecurityBot
 from hunter import HunterX
@@ -30,6 +31,7 @@ LEVEL_PATHS = (
     ROOT / "levels" / "level_02.txt",
     ROOT / "levels" / "level_03.txt",
     ROOT / "levels" / "level_04.txt",
+    ROOT / "levels" / "level_05.txt",
 )
 LEVEL_PATH = LEVEL_PATHS[0]
 
@@ -241,6 +243,23 @@ class Game:
                 )
             )
 
+        self.bosses: list[WardenPrime] = []
+        for spawn in self.level.boss_spawns:
+            self.bosses.append(
+                WardenPrime.from_tile(
+                    spawn,
+                    waypoints=self._patrol_route(spawn),
+                    tile_size=settings.TILE_SIZE,
+                    size=52,
+                    patrol_speed=settings.BOSS_PATROL_SPEED,
+                    chase_speed=settings.BOSS_CHASE_SPEED,
+                    detection_range=settings.BOSS_DETECTION_RANGE,
+                    search_duration=settings.ENEMY_SEARCH_SECONDS,
+                    repath_interval=settings.ENEMY_REPATH_SECONDS,
+                    tile_map=self.level,
+                )
+            )
+
         self.elapsed = 0.0
         self.security_events = 0
         self.last_enemy_states = [bot.state for bot in self.enemies]
@@ -289,6 +308,13 @@ class Game:
                 hacked=hacked,
                 total=len(self.terminals),
             )
+        if self.bosses and not self.boss_defeated:
+            boss = self.boss
+            if boss is not None:
+                return story.boss_objective.format(
+                    health=boss.health,
+                    max_health=boss.max_health,
+                )
         return story.exit_objective
 
     @property
@@ -296,7 +322,22 @@ class Game:
         return not self.terminals or all(terminal.hacked for terminal in self.terminals)
 
     @property
+    def boss(self) -> WardenPrime | None:
+        return self.bosses[0] if self.bosses else None
+
+    @property
+    def boss_defeated(self) -> bool:
+        return not self.bosses or all(boss.defeated for boss in self.bosses)
+
+    @property
+    def exit_ready(self) -> bool:
+        return self.terminal_hacked and self.boss_defeated
+
+    @property
     def security_state_name(self) -> str:
+        boss = self.boss
+        if boss is not None:
+            return f"PRIME:{boss.state_name}"
         active_hunters = [hunter for hunter in self.hunters if hunter.active]
         for state_name in ("CHASE", "SEARCH", "DISABLED", "RETURN", "PATROL"):
             if any(hunter.state_name == state_name for hunter in active_hunters):
@@ -370,6 +411,8 @@ class Game:
                 self._begin_mission(2)
             elif event.key in (pygame.K_4, pygame.K_KP4) and self.scene is Scene.MENU:
                 self._begin_mission(3)
+            elif event.key in (pygame.K_5, pygame.K_KP5) and self.scene is Scene.MENU:
+                self._begin_mission(4)
             elif event.key == pygame.K_SPACE and self.scene is Scene.BRIEFING:
                 self._leave_briefing()
             elif event.key == pygame.K_r and self.scene is not Scene.MENU:
@@ -435,6 +478,10 @@ class Game:
                     camera.disable_permanently()
                 for hunter in self.hunters:
                     hunter.deactivate()
+                for boss in self.bosses:
+                    if not boss.defeated:
+                        boss.alert_to(self.player.position)
+                        self.player.add_emp_charge(boss.max_health)
                 self.alarm_level = 0
                 message = MISSION_STORIES[self.level_index].network_clear_message
             else:
@@ -539,6 +586,19 @@ class Game:
                 self.scene = Scene.CAUGHT
                 return
 
+        for boss in self.bosses:
+            boss.update(
+                dt,
+                self.player,
+                self.blockers,
+                tile_map=self.level,
+                opened_doors=opened,
+                los_test=self._line_of_sight,
+            )
+            if boss.touching_player(self.player):
+                self.scene = Scene.CAUGHT
+                return
+
         current_enemy_states = tuple(bot.state for bot in self.enemies)
         chase_started = any(
             state is EnemyState.CHASE
@@ -571,6 +631,8 @@ class Game:
         )
         for bot in self.enemies:
             bot.alert_to(last_seen)
+        for boss in self.bosses:
+            boss.alert_to(last_seen)
         if self.alarm_level >= settings.ALARM_HUNTER_LEVEL:
             for hunter in self.hunters:
                 hunter.activate(last_seen)
@@ -580,6 +642,39 @@ class Game:
             )
 
     def _activate_emp(self) -> bool:
+        nearby_boss = next(
+            (
+                boss
+                for boss in self.bosses
+                if not boss.defeated
+                and boss.position.distance_to(self.player.position)
+                <= settings.EMP_RADIUS
+            ),
+            None,
+        )
+        if (
+            self.bosses
+            and self.terminal_hacked
+            and not self.boss_defeated
+            and nearby_boss is None
+        ):
+            self.ui.toast.show(
+                "WARDEN PRIME OUT OF EMP RANGE // MOVE CLOSER",
+                YELLOW,
+                1.4,
+            )
+            return False
+        if (
+            nearby_boss is not None
+            and self.terminal_hacked
+            and not nearby_boss.ready_for_emp
+        ):
+            self.ui.toast.show(
+                f"EMP COUPLING RECHARGING // {nearby_boss.damage_cooldown_remaining:.1f}s",
+                YELLOW,
+                1.2,
+            )
+            return False
         if not self.player.use_emp_charge():
             self.ui.toast.show("NO EMP CHARGE AVAILABLE", STEEL, 1.3)
             return False
@@ -591,12 +686,41 @@ class Game:
             if position.distance_to(self.player.position) <= settings.EMP_RADIUS:
                 device.disable(settings.EMP_DISABLE_SECONDS)
                 affected += 1
+
+        boss_hit: BossHit | None = None
+        if nearby_boss is not None:
+            boss_hit = nearby_boss.receive_emp(shield_down=self.terminal_hacked)
+            if boss_hit is BossHit.COOLDOWN:
+                self.player.add_emp_charge()
+                self.ui.toast.show("EMP COUPLING RECHARGING", YELLOW, 1.1)
+                return False
+            affected += 1
+
         self.alarm_level = max(0, self.alarm_level - 1)
-        self.ui.toast.show(
-            f"EMP DISCHARGED // {affected} SECURITY DEVICE(S) DISABLED",
-            CYAN,
-            2.0,
-        )
+        if boss_hit is BossHit.SHIELDED:
+            self.ui.toast.show(
+                "WARDEN SHIELD ABSORBED EMP // HACK ALL ANCHORS",
+                YELLOW,
+                2.2,
+            )
+        elif boss_hit is BossHit.DAMAGED:
+            self.ui.toast.show(
+                f"DIRECT HIT // WARDEN INTEGRITY {nearby_boss.health}/{nearby_boss.max_health}",
+                RED,
+                2.0,
+            )
+        elif boss_hit is BossHit.DEFEATED:
+            self.ui.toast.show(
+                "WARDEN PRIME DEFEATED // SURFACE EXIT OPEN",
+                GREEN,
+                2.8,
+            )
+        else:
+            self.ui.toast.show(
+                f"EMP DISCHARGED // {affected} SECURITY DEVICE(S) DISABLED",
+                CYAN,
+                2.0,
+            )
         return True
 
     def _interaction_target(self) -> object | None:
@@ -640,6 +764,8 @@ class Game:
                 return "[E]  EXIT REQUIRES BLUE KEYCARD"
             if not self.terminal_hacked:
                 return "[E]  EXIT LOCKDOWN — HACK TERMINAL"
+            if not self.boss_defeated:
+                return "[E]  EXIT LOCKDOWN — DEFEAT WARDEN PRIME"
             return "[E]  OPEN EXIT"
         if isinstance(target, Door):
             return "[E]  OPEN ACCESS DOOR" if self.player.has_keycard() else "[E]  BLUE ACCESS REQUIRED"
@@ -687,6 +813,13 @@ class Game:
         if isinstance(target, Exit):
             if not self.terminal_hacked:
                 self.ui.toast.show("EXIT LOCKDOWN // HACK SECURITY TERMINAL", RED, 1.9)
+                return
+            if not self.boss_defeated:
+                self.ui.toast.show(
+                    "EXIT LOCKDOWN // DEFEAT WARDEN PRIME WITH EMP",
+                    RED,
+                    2.0,
+                )
                 return
             if target.interact(self.player):
                 self.scene = Scene.WON
@@ -752,7 +885,7 @@ class Game:
         self.screen.blit(image, image.get_rect(center=screen_center))
 
     def _draw_security_field(self, bot: SecurityBot) -> None:
-        if getattr(bot, "dormant", False):
+        if getattr(bot, "dormant", False) or getattr(bot, "defeated", False):
             return
         center = (
             round(bot.position.x + self.map_offset.x),
@@ -834,7 +967,7 @@ class Game:
 
         for camera in self.cameras:
             self._draw_camera_cone(camera)
-        for bot in (*self.enemies, *self.hunters):
+        for bot in (*self.enemies, *self.hunters, *self.bosses):
             self._draw_security_field(bot)
         for door in self.doors:
             name = "door_open.png" if door.is_open else "door_locked.png"
@@ -896,6 +1029,16 @@ class Game:
             self._blit_world_center(
                 self.assets.get(hunter_name, (58, 48)), hunter.rect.center
             )
+        for boss in self.bosses:
+            self._blit_world_center(
+                self.assets.warden_prime(
+                    shielded=not self.terminal_hacked,
+                    damaged=0 < boss.health < boss.max_health,
+                    defeated=boss.defeated,
+                    size=(78, 68),
+                ),
+                boss.rect.center,
+            )
 
         action = "walk" if self.player.is_moving else "idle"
         player_name = f"player_{action}_{self.player.facing}"
@@ -938,6 +1081,11 @@ class Game:
             )
             if self.terminals
             else None,
+            boss_name="WARDEN PRIME" if self.boss is not None else None,
+            boss_health=self.boss.health if self.boss is not None else 0,
+            boss_max_health=self.boss.max_health if self.boss is not None else 0,
+            boss_shielded=bool(self.boss is not None and not self.terminal_hacked),
+            boss_defeated=bool(self.boss is not None and self.boss.defeated),
             dash_active=self.dash_active,
         )
 

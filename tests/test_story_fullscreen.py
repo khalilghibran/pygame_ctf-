@@ -41,7 +41,7 @@ class StoryAndFullscreenTests(unittest.TestCase):
         self.game._handle_events()
 
     def test_every_level_has_complete_story_data(self) -> None:
-        self.assertEqual(len(MISSION_STORIES), 4)
+        self.assertEqual(len(MISSION_STORIES), 5)
         for story in MISSION_STORIES:
             self.assertTrue(story.chapter)
             self.assertTrue(story.title)
@@ -76,6 +76,11 @@ class StoryAndFullscreenTests(unittest.TestCase):
         self.assertEqual(self.game.scene, Scene.BRIEFING)
         self.assertEqual(self.game.level_index, 3)
 
+        self.game.scene = Scene.MENU
+        self.press(pygame.K_5, unicode="5")
+        self.assertEqual(self.game.scene, Scene.BRIEFING)
+        self.assertEqual(self.game.level_index, 4)
+
     def test_chapter_one_completion_routes_to_chapter_two_story(self) -> None:
         self.game._load_level(0)
         self.game.scene = Scene.WON
@@ -85,8 +90,8 @@ class StoryAndFullscreenTests(unittest.TestCase):
         self.assertEqual(self.game.level_index, 1)
         self.assertEqual(self.game.scene, Scene.BRIEFING)
 
-    def test_campaign_completion_advances_through_all_four_chapters(self) -> None:
-        for index in range(3):
+    def test_campaign_completion_advances_through_all_five_chapters(self) -> None:
+        for index in range(4):
             with self.subTest(level=index):
                 self.game._load_level(index)
                 self.game.scene = Scene.WON
@@ -94,13 +99,13 @@ class StoryAndFullscreenTests(unittest.TestCase):
                 self.assertEqual(self.game.level_index, index + 1)
                 self.assertEqual(self.game.scene, Scene.BRIEFING)
 
-        self.game._load_level(3)
+        self.game._load_level(4)
         self.game.scene = Scene.WON
         self.press(pygame.K_RETURN, unicode="\r")
-        self.assertEqual(self.game.level_index, 3)
+        self.assertEqual(self.game.level_index, 4)
         self.assertEqual(self.game.scene, Scene.PLAYING)
 
-    def test_briefings_and_both_endings_render_headlessly(self) -> None:
+    def test_all_briefings_and_endings_render_headlessly(self) -> None:
         for index in range(len(MISSION_STORIES)):
             with self.subTest(level=index):
                 self.game._begin_mission(index)

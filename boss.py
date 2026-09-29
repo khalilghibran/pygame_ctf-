@@ -43,6 +43,9 @@ class WardenPrime(SecurityBot):
         self.stun_seconds = max(0.0, float(stun_seconds))
         self.damage_cooldown_remaining = 0.0
         self.defeated = False
+        self._base_patrol_speed = self.patrol_speed
+        self._base_chase_speed = self.chase_speed
+        self._base_detection_range = self.detection_range
 
     @property
     def state_name(self) -> str:
@@ -73,6 +76,12 @@ class WardenPrime(SecurityBot):
 
         self.health = max(0, self.health - 1)
         self.damage_cooldown_remaining = self.hit_cooldown
+        damage_taken = self.max_health - self.health
+        self.patrol_speed = self._base_patrol_speed * (1.0 + 0.06 * damage_taken)
+        self.chase_speed = self._base_chase_speed * (1.0 + 0.08 * damage_taken)
+        self.detection_range = self._base_detection_range * (
+            1.0 + 0.06 * damage_taken
+        )
         if self.health <= 0:
             self.defeated = True
             self.velocity.update(0.0, 0.0)
@@ -108,6 +117,9 @@ class WardenPrime(SecurityBot):
         self.health = self.max_health
         self.damage_cooldown_remaining = 0.0
         self.defeated = False
+        self.patrol_speed = self._base_patrol_speed
+        self.chase_speed = self._base_chase_speed
+        self.detection_range = self._base_detection_range
 
 
 __all__ = ["BossHit", "WardenPrime"]
