@@ -193,9 +193,43 @@ class UI:
         box.center = (self.width // 2, self.height // 2 + 88)
         self.panel(surface, box, border=CYAN)
         self.text(surface, "ENTER  START MISSION", (box.centerx, box.y + 27), size=23, color=CYAN, bold=True, anchor="midtop")
-        self.text(surface, "1  LAB A-1    2  EXPANSION LAB A-2", (box.centerx, box.y + 68), size=15, color=YELLOW, anchor="midtop")
+        self.text(surface, "1  WAKE PROTOCOL    2  THE LAST SIGNAL", (box.centerx, box.y + 68), size=15, color=YELLOW, anchor="midtop")
         self.text(surface, "WASD / ARROWS  Move    E  Interact    SPACE  EMP", (box.centerx, box.y + 102), size=14, color=LIGHT, anchor="midtop")
-        self.text(surface, "SHIFT  Dash    ESC  Pause    Q  Quit", (self.width // 2, self.height - 31), size=14, color=STEEL, anchor="midbottom")
+        self.text(surface, "SHIFT  Dash    ESC  Pause    F11  Fullscreen    Q  Quit", (self.width // 2, self.height - 31), size=14, color=STEEL, anchor="midbottom")
+
+    def draw_briefing(self, surface: pygame.Surface, story: object) -> None:
+        """Draw one campaign chapter's story and play instructions."""
+
+        shade = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        shade.fill((2, 8, 15, 232))
+        surface.blit(shade, (0, 0))
+        box = pygame.Rect(0, 0, 800, 532)
+        box.center = (self.width // 2, self.height // 2)
+        self.panel(surface, box, border=CYAN, fill=NAVY, alpha=252, radius=10)
+
+        chapter = str(getattr(story, "chapter", "MISSION"))
+        lab_label = str(getattr(story, "lab_label", "LAB"))
+        title = str(getattr(story, "title", "BRIEFING"))
+        transmission = str(getattr(story, "transmission", ""))
+        self.text(surface, f"{chapter} // {lab_label}", (box.centerx, box.y + 24), size=16, color=YELLOW, bold=True, anchor="midtop")
+        self.text(surface, title, (box.centerx, box.y + 55), size=38, color=CYAN, bold=True, anchor="midtop")
+        self.text(surface, transmission, (box.centerx, box.y + 108), size=14, color=RED, bold=True, anchor="midtop")
+
+        y = box.y + 150
+        for line in tuple(getattr(story, "story_lines", ())):
+            self.text(surface, str(line), (box.centerx, y), size=17, color=WHITE, anchor="midtop")
+            y += 28
+
+        divider_y = y + 7
+        pygame.draw.line(surface, STEEL, (box.x + 70, divider_y), (box.right - 70, divider_y), 1)
+        self.text(surface, "HOW THIS CHAPTER WORKS", (box.centerx, divider_y + 18), size=15, color=YELLOW, bold=True, anchor="midtop")
+        y = divider_y + 52
+        for index, line in enumerate(tuple(getattr(story, "mission_lines", ())), 1):
+            self.text(surface, f"{index}. {line}", (box.x + 100, y), size=16, color=LIGHT, anchor="topleft")
+            y += 30
+
+        self.text(surface, "ENTER / SPACE  Begin mission", (box.centerx, box.bottom - 56), size=19, color=GREEN, bold=True, anchor="midtop")
+        self.text(surface, "ESC  Return to menu    F11 / ALT+ENTER  Fullscreen", (box.centerx, box.bottom - 24), size=13, color=STEEL, anchor="midbottom")
 
     def draw_hacking(self, surface: pygame.Surface, puzzle: object) -> None:
         """Draw the terminal memory-sequence mini-game."""
@@ -244,8 +278,14 @@ class UI:
 
             attempts = int(getattr(puzzle, "attempts_remaining", getattr(puzzle, "attempts", 3)))
             self.text(surface, f"ATTEMPTS  {attempts}", (box.centerx, box.y + 264), size=16, color=RED if attempts <= 1 else LIGHT, anchor="midtop")
-            instruction = "Observe..." if reveal else "Keys 1-4: input    Backspace: erase    Enter: submit"
-            self.text(surface, instruction, (box.centerx, box.y + 308), size=16, color=LIGHT, anchor="midtop")
+            if reveal:
+                remaining = max(0.0, float(getattr(puzzle, "reveal_remaining", 0.0)))
+                instruction = f"INPUT LOCKED // MEMORIZE ({remaining:.1f}s)"
+                instruction_color = YELLOW
+            else:
+                instruction = "INPUT ACTIVE // 1-4 type    Backspace erase    Enter submit"
+                instruction_color = GREEN
+            self.text(surface, instruction, (box.centerx, box.y + 308), size=16, color=instruction_color, anchor="midtop")
         self.text(surface, "ESC  Disconnect", (box.centerx, box.bottom - 34), size=14, color=STEEL, anchor="midbottom")
 
     def draw_overlay(

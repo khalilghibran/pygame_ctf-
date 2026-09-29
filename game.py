@@ -19,6 +19,7 @@ from item import BatteryPack, Keycard
 from level import TileMap
 from pathfinding import has_line_of_sight
 from player import Player
+from story import MISSION_STORIES
 from systems import CCTV, EMPCharge, HackingPuzzle, HackingState, Terminal
 from ui import CYAN, GREEN, NAVY, RED, STEEL, YELLOW, UI
 
@@ -33,6 +34,7 @@ LEVEL_PATH = LEVEL_PATHS[0]
 
 class Scene(str, Enum):
     MENU = "MENU"
+    BRIEFING = "BRIEFING"
     PLAYING = "PLAYING"
     HACKING = "HACKING"
     PAUSED = "PAUSED"
@@ -44,10 +46,13 @@ class Scene(str, Enum):
 class Game:
     """Own the window, scene state, level entities, and gameplay loop."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, fullscreen: bool | None = None) -> None:
         pygame.init()
         pygame.display.set_caption(settings.GAME_TITLE)
-        self.screen = pygame.display.set_mode(settings.SCREEN_SIZE)
+        self.fullscreen = (
+            settings.START_FULLSCREEN if fullscreen is None else bool(fullscreen)
+        )
+        self.screen = self._apply_display_mode()
         self.clock = pygame.time.Clock()
         self.ui = UI(settings.SCREEN_SIZE)
         self.assets = SpriteLibrary(tile_size=settings.TILE_SIZE)
@@ -62,6 +67,31 @@ class Game:
         self.campaign_detections = 0
         self._reset_world()
         self.scene = Scene.MENU
+
+    def _apply_display_mode(self) -> pygame.Surface:
+        """Create a scaled 1280x720 canvas in fullscreen or windowed mode."""
+
+        # SDL's non-visual test driver can crash when its display is repeatedly
+        # recreated with SCALED. It has no real monitor to make fullscreen, so
+        # retain the requested state while using a logical-size test surface.
+        if pygame.display.get_driver() == "dummy":
+            return pygame.display.set_mode(settings.SCREEN_SIZE)
+
+        flags = pygame.SCALED
+        flags |= pygame.FULLSCREEN if self.fullscreen else pygame.RESIZABLE
+        try:
+            return pygame.display.set_mode(settings.SCREEN_SIZE, flags, vsync=1)
+        except pygame.error:
+            # A small number of remote desktops and older SDL drivers cannot
+            # create a scaled fullscreen renderer. Keep the game playable.
+            self.fullscreen = False
+            return pygame.display.set_mode(settings.SCREEN_SIZE, pygame.RESIZABLE)
+
+    def _toggle_fullscreen(self) -> None:
+        """Switch display mode without resetting the current mission."""
+
+        self.fullscreen = not self.fullscreen
+        self.screen = self._apply_display_mode()
 
     def _prepare_level_geometry(self) -> None:
         map_width = self.level.width * settings.TILE_SIZE
@@ -92,6 +122,18 @@ class Game:
         self.level = TileMap.from_file(LEVEL_PATHS[index])
         self._prepare_level_geometry()
         self._reset_world()
+
+    def _begin_mission(self, index: int) -> None:
+        """Load a mission and show its authored chapter briefing."""
+
+        self._load_level(index)
+        self.scene = Scene.BRIEFING
+
+    def _leave_briefing(self) -> None:
+        """Start play after the player has read the current briefing."""
+
+        self.scene = Scene.PLAYING
+        self.ui.toast.show(MISSION_STORIES[self.level_index].start_message, CYAN, 2.8)
 
     def _make_ambient_nodes(self) -> tuple[tuple[int, int, int], ...]:
         generator = random.Random(101)
@@ -231,11 +273,13 @@ class Game:
     @property
     def objective(self) -> str:
         if not self.player.has_keycard("blue"):
-            return settings.OBJECTIVE_TEXT
+            if self.level_index == 1:
+                return "Recover the blue keycard carrying the archive cipher."
+            return "Recover the blue keycard and reach the freight lift."
         if self.terminals and not self.terminal_hacked:
-            return "Hack the security terminal."
+            return "Hack the archive terminal and recover the last signal."
         if self.player.has_keycard("blue"):
-            return "Reach the exit. Access granted."
+            return "Reach the exit and broadcast the evidence."
         return settings.OBJECTIVE_TEXT
 
     @property
@@ -281,6 +325,13 @@ class Game:
             if event.type != pygame.KEYDOWN:
                 continue
 
+            alt_enter = event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and bool(
+                getattr(event, "mod", 0) & pygame.KMOD_ALT
+            )
+            if event.key == pygame.K_F11 or alt_enter:
+                self._toggle_fullscreen()
+                continue
+
             if self.scene is Scene.HACKING:
                 self._handle_hacking_key(event)
                 continue
@@ -289,16 +340,20 @@ class Game:
                 self.running = False
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 if self.scene is Scene.MENU:
-                    self._load_level(0)
+                    self._begin_mission(0)
+                elif self.scene is Scene.BRIEFING:
+                    self._leave_briefing()
                 elif self.scene in (Scene.WON, Scene.CAUGHT, Scene.POWER_OUT):
                     if self.scene is Scene.WON and self.level_index + 1 < len(LEVEL_PATHS):
-                        self._load_level(self.level_index + 1)
+                        self._begin_mission(self.level_index + 1)
                     else:
                         self._reset_world()
             elif event.key == pygame.K_1 and self.scene is Scene.MENU:
-                self._load_level(0)
+                self._begin_mission(0)
             elif event.key == pygame.K_2 and self.scene is Scene.MENU:
-                self._load_level(1)
+                self._begin_mission(1)
+            elif event.key == pygame.K_SPACE and self.scene is Scene.BRIEFING:
+                self._leave_briefing()
             elif event.key == pygame.K_r and self.scene is not Scene.MENU:
                 self._reset_world()
             elif event.key == pygame.K_ESCAPE:
@@ -306,6 +361,8 @@ class Game:
                     self.scene = Scene.PAUSED
                 elif self.scene is Scene.PAUSED:
                     self.scene = Scene.PLAYING
+                elif self.scene is Scene.BRIEFING:
+                    self.scene = Scene.MENU
                 elif self.scene is Scene.MENU:
                     self.running = False
             elif event.key == pygame.K_e and self.scene is Scene.PLAYING:
@@ -327,8 +384,22 @@ class Game:
         if event.key == pygame.K_BACKSPACE:
             puzzle.backspace()
             return
-        if event.unicode in "1234" and len(event.unicode) == 1:
-            puzzle.enter_symbol(event.unicode)
+        symbol_keys = {
+            pygame.K_1: "1",
+            pygame.K_2: "2",
+            pygame.K_3: "3",
+            pygame.K_4: "4",
+            pygame.K_KP1: "1",
+            pygame.K_KP2: "2",
+            pygame.K_KP3: "3",
+            pygame.K_KP4: "4",
+        }
+        symbol = symbol_keys.get(event.key)
+        if symbol is None:
+            typed = getattr(event, "unicode", "")
+            symbol = typed if typed in "1234" and len(typed) == 1 else None
+        if symbol is not None:
+            puzzle.enter_symbol(symbol)
             return
         if event.key not in (pygame.K_RETURN, pygame.K_KP_ENTER):
             return
@@ -342,7 +413,7 @@ class Game:
                 camera.disable_permanently()
             self.alarm_level = 0
             self.scene = Scene.PLAYING
-            self.ui.toast.show("NETWORK OFFLINE // EXIT AUTHORIZED", GREEN, 2.5)
+            self.ui.toast.show("LAST SIGNAL RECOVERED // EXIT AUTHORIZED", GREEN, 2.5)
             self.active_terminal = None
             self.hacking_puzzle = None
         elif puzzle.attempts_remaining < attempts_before:
@@ -828,6 +899,11 @@ class Game:
         pulse = (math.sin(self._animation_time * 3.0) + 1.0) * 0.5
         if self.scene is Scene.MENU:
             self.ui.draw_title(self.screen, pulse)
+        elif self.scene is Scene.BRIEFING:
+            self.ui.draw_briefing(
+                self.screen,
+                MISSION_STORIES[self.level_index],
+            )
         elif self.scene is Scene.HACKING and self.hacking_puzzle is not None:
             self.ui.draw_hacking(self.screen, self.hacking_puzzle)
         elif self.scene is Scene.PAUSED:
@@ -841,15 +917,22 @@ class Game:
         elif self.scene is Scene.WON:
             minutes, seconds = divmod(int(self.elapsed), 60)
             has_next = self.level_index + 1 < len(LEVEL_PATHS)
+            story = MISSION_STORIES[self.level_index]
+            action = (
+                "ENTER  Continue to Chapter II     R  Retry"
+                if has_next
+                else "ENTER / R  Run again     Q  Quit"
+            )
             self.ui.draw_overlay(
                 self.screen,
-                f"LAB A-{self.level_index + 1} CLEAR" if has_next else "ESCAPE COMPLETE",
-                "Expansion sector unlocked." if has_next else "RX-01 escaped the laboratory complex.",
+                story.clear_title,
+                story.clear_subtitle,
                 (
+                    *story.clear_lines,
                     f"TIME  {minutes:02d}:{seconds:02d}",
                     f"DETECTIONS  {self.security_events}",
                     f"BATTERY  {self.player.battery:.0f}%",
-                    "ENTER  Continue to Lab A-2     R  Retry" if has_next else "ENTER / R  Run again     Q  Quit",
+                    action,
                 ),
                 color=GREEN,
             )
