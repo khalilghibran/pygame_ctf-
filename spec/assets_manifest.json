@@ -1,0 +1,121 @@
+{
+  "project": "Robot Lab Escape",
+  "engine": "pygame",
+  "art_direction": "top-down 2D sci-fi laboratory, compact readable silhouettes, dark navy/steel environment, cyan player tech glow, red security glow",
+  "recommended_tile_size": 32,
+  "player": {
+    "id": "rx01",
+    "required": [
+      "player_idle_down.png",
+      "player_idle_up.png",
+      "player_idle_left.png",
+      "player_idle_right.png",
+      "player_walk_down_0.png",
+      "player_walk_down_1.png",
+      "player_walk_up_0.png",
+      "player_walk_up_1.png",
+      "player_walk_left_0.png",
+      "player_walk_left_1.png",
+      "player_walk_right_0.png",
+      "player_walk_right_1.png"
+    ],
+    "optional": [
+      "player_dash.png",
+      "player_interact.png",
+      "player_hack.png",
+      "player_cloak.png"
+    ]
+  },
+  "enemies": {
+    "security_bot": [
+      "security_idle_down.png",
+      "security_idle_up.png",
+      "security_idle_left.png",
+      "security_idle_right.png",
+      "security_walk_down_0.png",
+      "security_walk_down_1.png",
+      "security_walk_up_0.png",
+      "security_walk_up_1.png",
+      "security_walk_left_0.png",
+      "security_walk_left_1.png",
+      "security_walk_right_0.png",
+      "security_walk_right_1.png"
+    ],
+    "hunter_x_optional": [
+      "hunter_idle.png",
+      "hunter_walk_0.png",
+      "hunter_walk_1.png",
+      "hunter_attack.png"
+    ]
+  },
+  "tiles": [
+    "floor_clean.png",
+    "floor_dark.png",
+    "floor_panel.png",
+    "floor_hazard.png",
+    "wall_top.png",
+    "wall_side.png",
+    "wall_corner.png",
+    "wall_glass.png"
+  ],
+  "environment": [
+    "server_rack.png",
+    "lab_table.png",
+    "crate.png",
+    "terminal.png",
+    "computer.png",
+    "locker.png",
+    "shelf.png",
+    "trash_bin.png"
+  ],
+  "doors": [
+    "door_closed.png",
+    "door_open.png",
+    "door_locked.png",
+    "exit_door.png",
+    "elevator.png"
+  ],
+  "items": [
+    "battery_pack.png",
+    "keycard_white.png",
+    "keycard_blue.png",
+    "keycard_red.png",
+    "data_chip.png",
+    "repair_kit.png",
+    "emp_charge.png",
+    "scanner_module.png",
+    "research_log.png"
+  ],
+  "security_devices": [
+    "cctv_down.png",
+    "cctv_up.png",
+    "cctv_left.png",
+    "cctv_right.png",
+    "alarm_beacon.png",
+    "laser_emitter.png"
+  ],
+  "effects": [
+    "effect_emp.png",
+    "effect_spark.png",
+    "effect_smoke.png",
+    "effect_hack.png",
+    "effect_laser.png"
+  ],
+  "ui": [
+    "hud_hp_frame.png",
+    "hud_battery_frame.png",
+    "hud_security_frame.png",
+    "icon_health.png",
+    "icon_battery.png",
+    "icon_alarm.png",
+    "dialogue_box.png"
+  ],
+  "gameplay_colors": {
+    "player_cyan": "#28D7FF",
+    "security_red": "#FF3B3B",
+    "exit_green": "#27D766",
+    "warning_yellow": "#F8C431",
+    "background_navy": "#0A1624",
+    "steel_gray": "#46586B"
+  }
+}

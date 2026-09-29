@@ -1,0 +1,23 @@
+########################
+#P..........#.....C...X#
+#...........#..........#
+#..####.....#...###....#
+#..#..M.K...D...#......#
+#..#........#...#..T...#
+#..####.....#..H...#...#
+#....B......#......#...#
+#....E......#..........#
+########################
+
+Legend:
+# wall
+P player start
+B battery pack
+D locked blue-keycard door
+E security bot
+K blue keycard
+X exit
+T hack terminal
+C CCTV camera
+M EMP charge
+H Hunter-X spawn
