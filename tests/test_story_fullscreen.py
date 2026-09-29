@@ -81,6 +81,11 @@ class StoryAndFullscreenTests(unittest.TestCase):
         self.assertEqual(self.game.scene, Scene.BRIEFING)
         self.assertEqual(self.game.level_index, 4)
 
+        self.game.scene = Scene.MENU
+        self.press(pygame.K_KP5, unicode="")
+        self.assertEqual(self.game.scene, Scene.BRIEFING)
+        self.assertEqual(self.game.level_index, 4)
+
     def test_chapter_one_completion_routes_to_chapter_two_story(self) -> None:
         self.game._load_level(0)
         self.game.scene = Scene.WON
@@ -101,7 +106,16 @@ class StoryAndFullscreenTests(unittest.TestCase):
 
         self.game._load_level(4)
         self.game.scene = Scene.WON
-        self.press(pygame.K_RETURN, unicode="\r")
+        self.press(pygame.K_KP_ENTER, unicode="")
+        self.assertEqual(self.game.level_index, 0)
+        self.assertEqual(self.game.scene, Scene.BRIEFING)
+
+    def test_final_chapter_retry_still_replays_the_boss_level(self) -> None:
+        self.game._load_level(4)
+        self.game.scene = Scene.WON
+
+        self.press(pygame.K_r, unicode="r")
+
         self.assertEqual(self.game.level_index, 4)
         self.assertEqual(self.game.scene, Scene.PLAYING)
 

@@ -29,6 +29,7 @@ GAME_TITLE: Final = "Robot Lab Escape"
 # Gameplay tuning ---------------------------------------------------------
 PLAYER_SPEED: Final = 220.0
 PLAYER_HITBOX_SIZE: Final = 30
+DOORWAY_COLLISION_CLEARANCE: Final = 6
 
 ENEMY_PATROL_SPEED: Final = 105.0
 ENEMY_CHASE_SPEED: Final = 165.0

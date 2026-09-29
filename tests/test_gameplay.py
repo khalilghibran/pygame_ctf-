@@ -73,6 +73,47 @@ class GameplayTests(unittest.TestCase):
         self.assertFalse(game.doors[0].blocks)
         self.assertTrue(game._line_of_sight(above, below))
 
+    def test_open_doorways_allow_slightly_off_center_entry(self) -> None:
+        game = self.game
+        cases = (
+            (0, 0, (0, -1), (0, 1), (12, 0)),
+            (4, 1, (-1, 0), (1, 0), (0, 12)),
+        )
+
+        for level_index, door_index, approach, movement, offset in cases:
+            with self.subTest(level=level_index + 1, door=door_index):
+                game._load_level(level_index)
+                door = game.doors[door_index]
+                start_tile = (
+                    door.tile[0] + approach[0],
+                    door.tile[1] + approach[1],
+                )
+                start = game._tile_center(start_tile) + pygame.Vector2(offset)
+
+                def reset_player() -> None:
+                    game.player.position.update(start)
+                    game.player.rect.center = tuple(map(round, start))
+
+                reset_player()
+                for _ in range(30):
+                    game.player.update(1 / 60, movement, game.blockers)
+
+                closed_edge = (
+                    game.player.rect.left if movement[0] else game.player.rect.top
+                )
+                target_edge = door.rect.right if movement[0] else door.rect.bottom
+                self.assertLess(closed_edge, target_edge)
+
+                door.open()
+                reset_player()
+                for _ in range(30):
+                    game.player.update(1 / 60, movement, game.blockers)
+
+                open_edge = (
+                    game.player.rect.left if movement[0] else game.player.rect.top
+                )
+                self.assertGreaterEqual(open_edge, target_edge)
+
     def test_battery_drain_restore_and_full_pickup_rule(self) -> None:
         player = self.game.player
         battery = self.game.batteries[0]

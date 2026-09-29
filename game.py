@@ -110,15 +110,37 @@ class Game:
         if self.map_offset.y + map_height > settings.SCREEN_HEIGHT - 80:
             self.map_offset.y = settings.SCREEN_HEIGHT - 80 - map_height
 
-        self.wall_rects = [
-            pygame.Rect(
+        wall_rects = {
+            (x, y): pygame.Rect(
                 x * settings.TILE_SIZE,
                 y * settings.TILE_SIZE,
                 settings.TILE_SIZE,
                 settings.TILE_SIZE,
             )
             for x, y in self.level.walls
-        ]
+        }
+
+        # Full-size wall tiles leave little tolerance for an imperfectly
+        # centered approach. Trim only the wall edges facing a doorway. The
+        # full-size Door object still blocks the passage while it is closed.
+        clearance = settings.DOORWAY_COLLISION_CLEARANCE
+        for door_x, door_y in self.level.door_positions:
+            above = wall_rects.get((door_x, door_y - 1))
+            below = wall_rects.get((door_x, door_y + 1))
+            left = wall_rects.get((door_x - 1, door_y))
+            right = wall_rects.get((door_x + 1, door_y))
+            if above is not None:
+                above.height = max(1, above.height - clearance)
+            if below is not None:
+                below.y += clearance
+                below.height = max(1, below.height - clearance)
+            if left is not None:
+                left.width = max(1, left.width - clearance)
+            if right is not None:
+                right.x += clearance
+                right.width = max(1, right.width - clearance)
+
+        self.wall_rects = list(wall_rects.values())
 
     def _load_level(self, index: int) -> None:
         """Load a campaign level and start a fresh run in it."""
@@ -401,6 +423,10 @@ class Game:
                 elif self.scene in (Scene.WON, Scene.CAUGHT, Scene.POWER_OUT):
                     if self.scene is Scene.WON and self.level_index + 1 < len(LEVEL_PATHS):
                         self._begin_mission(self.level_index + 1)
+                    elif self.scene is Scene.WON:
+                        self.campaign_elapsed = 0.0
+                        self.campaign_detections = 0
+                        self._begin_mission(0)
                     else:
                         self._reset_world()
             elif event.key in (pygame.K_1, pygame.K_KP1) and self.scene is Scene.MENU:
@@ -1114,7 +1140,7 @@ class Game:
             action = (
                 f"ENTER  Continue to {MISSION_STORIES[self.level_index + 1].chapter}     R  Retry"
                 if has_next
-                else "ENTER / R  Run again     Q  Quit"
+                else "ENTER  Start new campaign     R  Replay CHAPTER V     Q  Quit"
             )
             self.ui.draw_overlay(
                 self.screen,

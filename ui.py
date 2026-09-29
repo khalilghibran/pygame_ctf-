@@ -243,9 +243,9 @@ class UI:
         self.text(surface, "ENTER  START CAMPAIGN", (box.centerx, box.y + 20), size=23, color=CYAN, bold=True, anchor="midtop")
         self.text(surface, "1  WAKE PROTOCOL       2  THE LAST SIGNAL", (box.centerx, box.y + 58), size=15, color=YELLOW, anchor="midtop")
         self.text(surface, "3  THE SLEEPING LINE   4  BREAK THE CYCLE", (box.centerx, box.y + 86), size=15, color=YELLOW, anchor="midtop")
-        self.text(surface, "5  WARDEN PRIME // BOSS FIGHT", (box.centerx, box.y + 114), size=15, color=RED, bold=True, anchor="midtop")
+        self.text(surface, "5 / NUMPAD 5  WARDEN PRIME // BOSS FIGHT", (box.centerx, box.y + 114), size=15, color=RED, bold=True, anchor="midtop")
         self.text(surface, "WASD / ARROWS  Move    E  Interact    SPACE  EMP", (box.centerx, box.y + 158), size=14, color=LIGHT, anchor="midtop")
-        self.text(surface, "SHIFT  Dash    ESC  Pause    F11  Fullscreen    Q  Quit", (self.width // 2, self.height - 31), size=14, color=STEEL, anchor="midbottom")
+        self.text(surface, "SHIFT  Dash    F11  Fullscreen    1-5  Select chapter    ESC / Q  Quit", (self.width // 2, self.height - 31), size=14, color=STEEL, anchor="midbottom")
 
     def draw_briefing(self, surface: pygame.Surface, story: object) -> None:
         """Draw one campaign chapter's story and play instructions."""

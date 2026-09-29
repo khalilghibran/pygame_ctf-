@@ -53,6 +53,8 @@ Chapter V is a boss level. WARDEN PRIME is shielded until all three terminals ar
 
 Touching an active security unit or reaching 0% battery ends the mission. A failed run can be retried immediately without replaying the story briefing.
 
+After the Chapter V ending, press `Enter` to begin a new campaign at the Chapter I briefing. Press `R` instead if you want to replay the boss level. Open access doors have extra collision clearance around their frames, so RX-01 does not need perfect center alignment to pass through them.
+
 ## Controls
 
 | Input | Action |
@@ -64,7 +66,7 @@ Touching an active security unit or reaching 0% battery ends the mission. A fail
 | `1`–`5` or numpad `1`–`5` | Select any campaign chapter from the menu |
 | `1`–`4` or numpad `1`–`4` | Enter a hacking sequence after input unlocks |
 | `Backspace` / `Enter` | Erase / submit a hacking sequence |
-| `Esc` | Pause, resume, disconnect, or return from a briefing |
+| `Esc` | Pause, resume, disconnect, return from a briefing, or quit from the title menu |
 | `R` | Restart the current mission |
 | `F11` / `Alt+Enter` | Toggle fullscreen without resetting the mission |
 | `Q` | Quit from a menu, briefing, pause, or result screen |
