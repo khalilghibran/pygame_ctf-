@@ -135,6 +135,7 @@ class UI:
         boss_shielded: bool = False,
         boss_defeated: bool = False,
         dash_active: bool = False,
+        difficulty_label: str | None = None,
     ) -> None:
         left = pygame.Rect(28, 18, 410, 82)
         middle = pygame.Rect(454, 18, 524, 82)
@@ -169,7 +170,8 @@ class UI:
         self.text(surface, objective, (472, 58), size=17, color=WHITE, bold=True)
 
         self.text(surface, "SECURITY", (1011, 30), size=14, color=state_color, bold=True)
-        self.text(surface, level_label, (1235, 30), size=12, color=LIGHT, bold=True, anchor="topright")
+        mode_text = f"{level_label} // {difficulty_label.upper()}" if difficulty_label else level_label
+        self.text(surface, mode_text, (1235, 30), size=11, color=LIGHT, bold=True, anchor="topright")
         self.text(surface, security_state, (1011, 54), size=21, color=state_color, bold=True)
         mins, secs = divmod(int(elapsed), 60)
         alarm_text = "ALARM " + ("■" * alarm_level) + ("□" * max(0, 3 - alarm_level))
@@ -221,31 +223,67 @@ class UI:
 
         if self.toast.remaining > 0 and self.toast.text:
             box = pygame.Rect(0, 0, min(760, max(360, len(self.toast.text) * 12)), 48)
-            box.midtop = (self.width // 2, 112)
+            # The boss health panel lives below the top HUD. Keep messages in
+            # the gap above the interaction prompt so neither panel is hidden.
+            if boss_name:
+                box.midbottom = (self.width // 2, self.height - 70)
+            else:
+                box.midtop = (self.width // 2, 112)
             self.panel(surface, box, border=self.toast.color, fill=NAVY, alpha=250)
             self.text(surface, self.toast.text, box.center, size=18, color=self.toast.color, bold=True, anchor="center")
 
-    def draw_title(self, surface: pygame.Surface, pulse: float) -> None:
+    def draw_title(
+        self, surface: pygame.Surface, pulse: float, difficulty_label: str = "EXPLORER"
+    ) -> None:
         shade = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        shade.fill((*NAVY, 212))
+        shade.fill((*NAVY, 222))
         surface.blit(shade, (0, 0))
-        title_y = self.height // 2 - 105
+        title_y = 107
         glow_alpha = int(18 + 12 * pulse)
-        glow = pygame.Surface((900, 105), pygame.SRCALPHA)
+        glow = pygame.Surface((900, 104), pygame.SRCALPHA)
         pygame.draw.rect(glow, (*CYAN, glow_alpha), glow.get_rect(), border_radius=30)
         pygame.draw.rect(glow, (*CYAN, 95), glow.get_rect(), 2, border_radius=30)
-        surface.blit(glow, glow.get_rect(center=(self.width // 2, title_y + 40)))
+        surface.blit(glow, glow.get_rect(center=(self.width // 2, title_y + 39)))
         self.text(surface, "ROBOT LAB ESCAPE", (self.width // 2, title_y), size=54, color=WHITE, bold=True, anchor="midtop")
         self.text(surface, "SNEAK. SOLVE. POWER UP. ESCAPE.", (self.width // 2, title_y + 72), size=20, color=CYAN, bold=True, anchor="midtop")
-        box = pygame.Rect(0, 0, 680, 218)
-        box.center = (self.width // 2, self.height // 2 + 98)
-        self.panel(surface, box, border=CYAN)
-        self.text(surface, "ENTER  START CAMPAIGN", (box.centerx, box.y + 20), size=23, color=CYAN, bold=True, anchor="midtop")
-        self.text(surface, "1  WAKE PROTOCOL       2  THE LAST SIGNAL", (box.centerx, box.y + 58), size=15, color=YELLOW, anchor="midtop")
-        self.text(surface, "3  THE SLEEPING LINE   4  BREAK THE CYCLE", (box.centerx, box.y + 86), size=15, color=YELLOW, anchor="midtop")
-        self.text(surface, "5 / NUMPAD 5  WARDEN PRIME // BOSS FIGHT", (box.centerx, box.y + 114), size=15, color=RED, bold=True, anchor="midtop")
-        self.text(surface, "WASD / ARROWS  Move    E  Interact    SPACE  EMP", (box.centerx, box.y + 158), size=14, color=LIGHT, anchor="midtop")
-        self.text(surface, "SHIFT  Dash    F11  Fullscreen    1-5  Select chapter    ESC / Q  Quit", (self.width // 2, self.height - 31), size=14, color=STEEL, anchor="midbottom")
+        box = pygame.Rect(0, 224, 784, 420)
+        box.centerx = self.width // 2
+        self.panel(surface, box, border=CYAN, alpha=246, radius=12)
+        self.text(surface, "ENTER  START FROM CHAPTER 1", (box.centerx, box.y + 17), size=22, color=CYAN, bold=True, anchor="midtop")
+        self.text(surface, "OR PRESS 1-5 TO CHOOSE A CHAPTER", (box.centerx, box.y + 50), size=14, color=LIGHT, anchor="midtop")
+
+        chapters = (
+            "WAKE PROTOCOL",
+            "THE LAST SIGNAL",
+            "THE SLEEPING LINE",
+            "BREAK THE CYCLE",
+            "WARDEN PRIME  //  BOSS FIGHT",
+        )
+        for index, name in enumerate(chapters, 1):
+            row = pygame.Rect(box.x + 28, box.y + 82 + (index - 1) * 42, box.width - 56, 35)
+            accent = RED if index == 5 else YELLOW
+            self.panel(surface, row, border=(84, 105, 123), fill=NAVY, alpha=221, radius=5)
+            number = pygame.Rect(row.x + 7, row.y + 5, 28, 25)
+            pygame.draw.rect(surface, accent, number, border_radius=4)
+            self.text(surface, str(index), number.center, size=17, color=NAVY, bold=True, anchor="center")
+            self.text(surface, name, (row.x + 48, row.y + 7), size=16, color=WHITE, bold=index == 5)
+            self.text(surface, f"PRESS {index}", (row.right - 14, row.y + 9), size=13, color=accent, bold=True, anchor="topright")
+
+        mode = difficulty_label.upper()
+        mode_color = GREEN if mode == "EXPLORER" else YELLOW
+        mode_box = pygame.Rect(box.x + 28, box.y + 300, box.width - 56, 48)
+        self.panel(surface, mode_box, border=mode_color, fill=NAVY, alpha=238, radius=6)
+        self.text(surface, "TAB  CHANGE MODE", (mode_box.x + 15, mode_box.y + 8), size=13, color=LIGHT, bold=True)
+        self.text(surface, mode, (mode_box.centerx, mode_box.y + 5), size=19, color=mode_color, bold=True, anchor="midtop")
+        self.text(surface, "RECOMMENDED" if mode == "EXPLORER" else "ORIGINAL RULES", (mode_box.right - 15, mode_box.y + 9), size=12, color=mode_color, anchor="topright")
+        mode_hint = (
+            "SLOWER GUARDS  /  3-NUMBER HACKS  /  AUTO PICKUPS  /  MORE POWER"
+            if mode == "EXPLORER"
+            else "FAST GUARDS  /  4-NUMBER HACKS  /  MANUAL PICKUPS"
+        )
+        self.text(surface, mode_hint, (mode_box.centerx, mode_box.y + 28), size=12, color=LIGHT, anchor="midtop")
+        self.text(surface, "WASD / ARROWS  MOVE     E  INTERACT     SPACE  EMP     SHIFT  DASH", (box.centerx, box.y + 369), size=14, color=LIGHT, anchor="midtop")
+        self.text(surface, "F11 / ALT+ENTER  FULLSCREEN     TAB  CHANGE MODE     ESC / Q  QUIT", (self.width // 2, self.height - 25), size=14, color=LIGHT, anchor="midbottom")
 
     def draw_briefing(self, surface: pygame.Surface, story: object) -> None:
         """Draw one campaign chapter's story and play instructions."""
@@ -278,6 +316,7 @@ class UI:
             self.text(surface, f"{index}. {line}", (box.x + 100, y), size=16, color=LIGHT, anchor="topleft")
             y += 30
 
+        self.text(surface, "WASD / ARROWS  MOVE    E  INTERACT    SPACE  EMP    SHIFT  DASH", (box.centerx, box.bottom - 91), size=12, color=LIGHT, anchor="midtop")
         self.text(surface, "ENTER / SPACE  Begin mission", (box.centerx, box.bottom - 56), size=19, color=GREEN, bold=True, anchor="midtop")
         self.text(surface, "ESC  Return to menu    F11 / ALT+ENTER  Fullscreen", (box.centerx, box.bottom - 24), size=13, color=STEEL, anchor="midbottom")
 
@@ -308,17 +347,26 @@ class UI:
 
         if "SUCCESS" in state:
             self.text(surface, "ACCESS GRANTED", (box.centerx, box.y + 145), size=34, color=GREEN, bold=True, anchor="midtop")
-            self.text(surface, "Security network disabled.", (box.centerx, box.y + 205), size=19, color=WHITE, anchor="midtop")
+            self.text(surface, "Terminal node disabled. Return to the lab.", (box.centerx, box.y + 205), size=19, color=WHITE, anchor="midtop")
+        elif "FAILURE" in state or "FAILED" in state:
+            self.text(surface, "ACCESS DENIED", (box.centerx, box.y + 145), size=34, color=RED, bold=True, anchor="midtop")
+            self.text(surface, "Reconnect to try the terminal again.", (box.centerx, box.y + 205), size=19, color=WHITE, anchor="midtop")
         else:
-            label = "MEMORIZE SEQUENCE" if reveal else "ENTER SEQUENCE"
+            label = "MEMORIZE THE NUMBERS" if reveal else "TYPE THE NUMBERS IN ORDER"
             self.text(surface, label, (box.centerx, box.y + 118), size=18, color=YELLOW if reveal else CYAN, bold=True, anchor="midtop")
-            count = max(4, len(sequence))
+            if reveal:
+                remaining = max(0.0, float(getattr(puzzle, "reveal_remaining", 0.0)))
+                duration = max(0.1, float(getattr(puzzle, "reveal_duration", 1.8)))
+                self.bar(surface, pygame.Rect(box.centerx - 155, box.y + 147, 310, 9), remaining, duration, YELLOW)
+            else:
+                self.text(surface, f"ENTERED {len(entered)}/{len(sequence)}", (box.right - 27, box.y + 123), size=13, color=GREEN, bold=True, anchor="topright")
+            count = max(1, len(sequence))
             start_x = box.centerx - (count * 68 + (count - 1) * 12) // 2
             for index in range(count):
                 token = pygame.Rect(start_x + index * 80, box.y + 165, 68, 72)
-                active_color = YELLOW if reveal else CYAN
+                active_color = YELLOW if reveal else GREEN if index < len(entered) else CYAN
                 pygame.draw.rect(surface, (8, 20, 31), token, border_radius=7)
-                pygame.draw.rect(surface, active_color, token, 2, border_radius=7)
+                pygame.draw.rect(surface, active_color, token, 3 if index == len(entered) and not reveal else 2, border_radius=7)
                 value = "?"
                 if reveal and index < len(sequence):
                     value = sequence[index]
@@ -327,13 +375,12 @@ class UI:
                 self.text(surface, value, token.center, size=34, color=WHITE, bold=True, anchor="center")
 
             attempts = int(getattr(puzzle, "attempts_remaining", getattr(puzzle, "attempts", 3)))
-            self.text(surface, f"ATTEMPTS  {attempts}", (box.centerx, box.y + 264), size=16, color=RED if attempts <= 1 else LIGHT, anchor="midtop")
+            self.text(surface, f"TRIES LEFT  {attempts}", (box.centerx, box.y + 264), size=16, color=RED if attempts <= 1 else LIGHT, bold=True, anchor="midtop")
             if reveal:
-                remaining = max(0.0, float(getattr(puzzle, "reveal_remaining", 0.0)))
-                instruction = f"INPUT LOCKED // MEMORIZE ({remaining:.1f}s)"
+                instruction = f"WATCH NOW  //  TYPING OPENS IN {remaining:.1f}s"
                 instruction_color = YELLOW
             else:
-                instruction = "INPUT ACTIVE // 1-4 type    Backspace erase    Enter submit"
+                instruction = "TYPE 1-4     BACKSPACE ERASE     ENTER CHECK"
                 instruction_color = GREEN
             self.text(surface, instruction, (box.centerx, box.y + 308), size=16, color=instruction_color, anchor="midtop")
         self.text(surface, "ESC  Disconnect", (box.centerx, box.bottom - 34), size=14, color=STEEL, anchor="midbottom")

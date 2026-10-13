@@ -13,6 +13,7 @@ import pygame
 import settings
 from assets import SpriteLibrary
 from boss import BossHit, WardenPrime
+from difficulty import CLASSIC, EXPLORER, DifficultyProfile
 from door import Door, Exit
 from enemy import EnemyState, SecurityBot
 from hunter import HunterX
@@ -53,9 +54,21 @@ class Scene(str, Enum):
 class Game:
     """Own the window, scene state, level entities, and gameplay loop."""
 
-    def __init__(self, *, fullscreen: bool | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fullscreen: bool | None = None,
+        difficulty: str | DifficultyProfile = "explorer",
+    ) -> None:
         pygame.init()
         pygame.display.set_caption(settings.GAME_TITLE)
+        if isinstance(difficulty, DifficultyProfile):
+            self.difficulty = difficulty
+        else:
+            mode = difficulty.casefold()
+            if mode not in {"explorer", "classic"}:
+                raise ValueError(f"unknown difficulty: {difficulty!r}")
+            self.difficulty = EXPLORER if mode == "explorer" else CLASSIC
         self.fullscreen = (
             settings.START_FULLSCREEN if fullscreen is None else bool(fullscreen)
         )
@@ -193,9 +206,9 @@ class Game:
             self.level.player_spawn,
             tile_size=settings.TILE_SIZE,
             size=settings.PLAYER_HITBOX_SIZE,
-            speed=settings.PLAYER_SPEED,
+            speed=self.difficulty.player_speed,
             max_battery=settings.BATTERY_MAX,
-            battery_drain_rate=settings.BATTERY_DRAIN_PER_SECOND,
+            battery_drain_rate=self.difficulty.battery_drain,
         )
         self.keycards = [
             Keycard.from_tile(tile, tile_size=settings.TILE_SIZE, color="blue")
@@ -205,7 +218,7 @@ class Game:
             BatteryPack.from_tile(
                 tile,
                 tile_size=settings.TILE_SIZE,
-                amount=settings.BATTERY_PICKUP_AMOUNT,
+                amount=self.difficulty.battery_pickup,
             )
             for tile in self.level.battery_positions
         ]
@@ -218,7 +231,12 @@ class Game:
             for tile in self.level.terminal_positions
         ]
         self.cameras = [
-            CCTV.from_tile(tile, tile_size=settings.TILE_SIZE, base_angle=90.0)
+            CCTV.from_tile(
+                tile,
+                tile_size=settings.TILE_SIZE,
+                base_angle=90.0,
+                detection_seconds=self.difficulty.cctv_detection_seconds,
+            )
             for tile in self.level.camera_positions
         ]
         self.doors = [
@@ -239,9 +257,9 @@ class Game:
                     waypoints=self._patrol_route(spawn),
                     tile_size=settings.TILE_SIZE,
                     size=settings.PLAYER_HITBOX_SIZE,
-                    patrol_speed=settings.ENEMY_PATROL_SPEED,
-                    chase_speed=settings.ENEMY_CHASE_SPEED,
-                    detection_range=settings.ENEMY_DETECTION_RANGE,
+                    patrol_speed=self.difficulty.enemy_patrol_speed,
+                    chase_speed=self.difficulty.enemy_chase_speed,
+                    detection_range=self.difficulty.enemy_detection_range,
                     search_duration=settings.ENEMY_SEARCH_SECONDS,
                     repath_interval=settings.ENEMY_REPATH_SECONDS,
                     tile_map=self.level,
@@ -256,9 +274,9 @@ class Game:
                     waypoints=self._patrol_route(spawn),
                     tile_size=settings.TILE_SIZE,
                     active=False,
-                    patrol_speed=settings.HUNTER_PATROL_SPEED,
-                    chase_speed=settings.HUNTER_CHASE_SPEED,
-                    detection_range=settings.HUNTER_DETECTION_RANGE,
+                    patrol_speed=self.difficulty.hunter_patrol_speed,
+                    chase_speed=self.difficulty.hunter_chase_speed,
+                    detection_range=self.difficulty.hunter_detection_range,
                     search_duration=settings.ENEMY_SEARCH_SECONDS,
                     repath_interval=settings.ENEMY_REPATH_SECONDS,
                     tile_map=self.level,
@@ -273,9 +291,10 @@ class Game:
                     waypoints=self._patrol_route(spawn),
                     tile_size=settings.TILE_SIZE,
                     size=52,
-                    patrol_speed=settings.BOSS_PATROL_SPEED,
-                    chase_speed=settings.BOSS_CHASE_SPEED,
-                    detection_range=settings.BOSS_DETECTION_RANGE,
+                    patrol_speed=self.difficulty.boss_patrol_speed,
+                    chase_speed=self.difficulty.boss_chase_speed,
+                    detection_range=self.difficulty.boss_detection_range,
+                    stun_seconds=self.difficulty.boss_stun_seconds,
                     search_duration=settings.ENEMY_SEARCH_SECONDS,
                     repath_interval=settings.ENEMY_REPATH_SECONDS,
                     tile_map=self.level,
@@ -295,6 +314,7 @@ class Game:
         self.dash_active = False
         self.emp_effect_remaining = 0.0
         self.emp_effect_center = self.player.position.copy()
+        self.contact_grace_remaining = 0.0
         self.scene = Scene.PLAYING
         lab_label = MISSION_STORIES[self.level_index].lab_label
         self.ui.toast.show(
@@ -415,6 +435,12 @@ class Game:
 
             if event.key == pygame.K_q and self.scene is not Scene.PLAYING:
                 self.running = False
+            elif event.key == pygame.K_TAB and self.scene is Scene.MENU:
+                self.difficulty = (
+                    CLASSIC if self.difficulty.name == "EXPLORER" else EXPLORER
+                )
+                self._reset_world()
+                self.scene = Scene.MENU
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 if self.scene is Scene.MENU:
                     self._begin_mission(0)
@@ -443,6 +469,12 @@ class Game:
                 self._leave_briefing()
             elif event.key == pygame.K_r and self.scene is not Scene.MENU:
                 self._reset_world()
+            elif event.key == pygame.K_h and self.scene in (Scene.PLAYING, Scene.PAUSED):
+                self.scene = (
+                    Scene.PAUSED if self.scene is Scene.PLAYING else Scene.PLAYING
+                )
+            elif event.key == pygame.K_m and self.scene is Scene.PAUSED:
+                self.scene = Scene.MENU
             elif event.key == pygame.K_ESCAPE:
                 if self.scene is Scene.PLAYING:
                     self.scene = Scene.PAUSED
@@ -499,6 +531,9 @@ class Game:
             self.scene = Scene.PLAYING
             hacked = sum(terminal.hacked for terminal in self.terminals)
             total = len(self.terminals)
+            late_explorer = self.difficulty.name == "EXPLORER" and self.level_index >= 2
+            if late_explorer:
+                self.player.restore_battery(15.0)
             if self.terminal_hacked:
                 for camera in self.cameras:
                     camera.disable_permanently()
@@ -511,8 +546,15 @@ class Game:
                 self.alarm_level = 0
                 message = MISSION_STORIES[self.level_index].network_clear_message
             else:
-                self.alarm_level = max(0, self.alarm_level - 1)
-                message = f"NETWORK NODE {hacked}/{total} OFFLINE // CONTINUE"
+                if late_explorer:
+                    self.alarm_level = 0
+                    for hunter in self.hunters:
+                        hunter.deactivate()
+                    self.player.add_emp_charge()
+                    message = f"NODE {hacked}/{total} OFFLINE // POWER + EMP RESTORED"
+                else:
+                    self.alarm_level = max(0, self.alarm_level - 1)
+                    message = f"NETWORK NODE {hacked}/{total} OFFLINE // CONTINUE"
             self.ui.toast.show(message, GREEN, 2.5)
             self.active_terminal = None
             self.hacking_puzzle = None
@@ -558,6 +600,7 @@ class Game:
         self.elapsed += dt
         self.campaign_elapsed += dt
         self.emp_effect_remaining = max(0.0, self.emp_effect_remaining - dt)
+        self.contact_grace_remaining = max(0.0, self.contact_grace_remaining - dt)
 
         movement = self._movement_input()
         keys = pygame.key.get_pressed()
@@ -566,14 +609,16 @@ class Game:
             and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])
             and self.player.battery > 1.0
         )
-        self.player.speed = settings.PLAYER_SPEED * (
+        self.player.speed = self.difficulty.player_speed * (
             settings.DASH_SPEED_MULTIPLIER if self.dash_active else 1.0
         )
         self.player.update(dt, movement, self.blockers)
-        self.player.speed = settings.PLAYER_SPEED
-        drain_rate = settings.BATTERY_DRAIN_PER_SECOND
+        self.player.speed = self.difficulty.player_speed
+        if self.difficulty.auto_collect:
+            self._auto_collect_nearby()
+        drain_rate = self.difficulty.battery_drain
         if self.dash_active:
-            drain_rate += settings.DASH_BATTERY_DRAIN_PER_SECOND
+            drain_rate += self.difficulty.dash_drain
         if self.player.drain_battery(dt, drain_rate):
             self.scene = Scene.POWER_OUT
             return
@@ -596,8 +641,8 @@ class Game:
                 los_test=self._line_of_sight,
             )
             if bot.touching_player(self.player):
-                self.scene = Scene.CAUGHT
-                return
+                if self._handle_security_contact(bot):
+                    return
 
         for hunter in self.hunters:
             hunter.update(
@@ -609,8 +654,8 @@ class Game:
                 los_test=self._line_of_sight,
             )
             if hunter.touching_player(self.player):
-                self.scene = Scene.CAUGHT
-                return
+                if self._handle_security_contact(hunter):
+                    return
 
         for boss in self.bosses:
             boss.update(
@@ -622,8 +667,8 @@ class Game:
                 los_test=self._line_of_sight,
             )
             if boss.touching_player(self.player):
-                self.scene = Scene.CAUGHT
-                return
+                if self._handle_security_contact(boss):
+                    return
 
         current_enemy_states = tuple(bot.state for bot in self.enemies)
         chase_started = any(
@@ -645,6 +690,50 @@ class Game:
         if self.enemies:
             self.last_security_state = self.enemy.state
 
+    def _auto_collect_nearby(self) -> None:
+        """Explorer mode picks up supplies when RX-01 reaches their tile."""
+
+        pickup_reach = self.player.rect.inflate(12, 12)
+        for keycard in self.keycards:
+            if keycard.active and pickup_reach.colliderect(keycard.rect):
+                if keycard.interact(self.player):
+                    self.ui.toast.show("KEYCARD ACQUIRED // DOORS UNLOCKED", CYAN, 2.0)
+        for battery in self.batteries:
+            missing_charge = self.player.max_battery - self.player.battery
+            if (
+                battery.active
+                and missing_charge >= min(battery.amount, 20.0)
+                and pickup_reach.colliderect(battery.rect)
+            ):
+                if battery.interact(self.player):
+                    self.ui.toast.show("BATTERY RESTORED", GREEN, 1.5)
+        for charge in self.emp_pickups:
+            if charge.active and pickup_reach.colliderect(charge.rect):
+                if charge.interact(self.player):
+                    self.ui.toast.show("EMP ACQUIRED // SPACE TO USE", CYAN, 1.8)
+
+    def _handle_security_contact(self, threat: SecurityBot) -> bool:
+        """Apply Explorer's safety buffer or end a Classic run on contact."""
+
+        if self.contact_grace_remaining > 0.0:
+            return False
+        penalty = self.difficulty.contact_battery_penalty
+        if penalty <= 0.0:
+            self.scene = Scene.CAUGHT
+            return True
+        self.player.battery = max(0.0, self.player.battery - penalty)
+        self.contact_grace_remaining = self.difficulty.contact_grace_seconds
+        threat.disable(self.difficulty.contact_grace_seconds)
+        if self.player.battery <= 0.0:
+            self.scene = Scene.POWER_OUT
+            return True
+        self.ui.toast.show(
+            f"SAFETY PULSE // -{penalty:.0f}% POWER // MOVE AWAY",
+            YELLOW,
+            2.0,
+        )
+        return False
+
     def _raise_alarm(
         self,
         amount: int,
@@ -659,7 +748,12 @@ class Game:
             bot.alert_to(last_seen)
         for boss in self.bosses:
             boss.alert_to(last_seen)
-        if self.alarm_level >= settings.ALARM_HUNTER_LEVEL:
+        hunter_threshold = (
+            settings.ALARM_MAX_LEVEL
+            if self.difficulty.name == "EXPLORER" and self.level_index >= 2
+            else settings.ALARM_HUNTER_LEVEL
+        )
+        if self.alarm_level >= hunter_threshold and not self.terminal_hacked:
             for hunter in self.hunters:
                 hunter.activate(last_seen)
         if self.alarm_level > previous:
@@ -750,12 +844,14 @@ class Game:
         return True
 
     def _interaction_target(self) -> object | None:
-        interaction_rect = self.player.interaction_rect(20)
+        interaction_rect = self.player.interaction_rect(
+            self.difficulty.interaction_padding
+        )
         candidates: list[object] = []
         candidates.extend(item for item in self.keycards if item.active)
         candidates.extend(item for item in self.batteries if item.active)
         candidates.extend(item for item in self.emp_pickups if item.active)
-        candidates.extend(self.terminals)
+        candidates.extend(terminal for terminal in self.terminals if not terminal.hacked)
         candidates.extend(door for door in self.doors if not door.is_open)
         candidates.append(self.exit)
         nearby = [
@@ -828,6 +924,9 @@ class Game:
             puzzle = target.begin_hack(
                 self.player,
                 rng=random.Random(self.level_index * 10_000 + int(self.elapsed * 1000)),
+                length=self.difficulty.hack_length,
+                reveal_duration=self.difficulty.hack_reveal_seconds,
+                max_attempts=self.difficulty.hack_attempts,
             )
             if puzzle is None:
                 self.ui.toast.show("TERMINAL ACCESS REQUIRES BLUE KEYCARD", RED, 1.8)
@@ -923,9 +1022,15 @@ class Game:
         local_center = (diameter // 2, diameter // 2)
         disabled = bool(getattr(bot, "disabled", False))
         color = CYAN if disabled else RED if bot.state is EnemyState.CHASE else (182, 62, 68)
-        alpha = 10 if disabled else 22 if bot.state is EnemyState.PATROL else 38
+        alpha = 6 if disabled else 10 if bot.state is EnemyState.PATROL else 30
         pygame.draw.circle(layer, (*color, alpha), local_center, radius)
-        pygame.draw.circle(layer, (*color, 90), local_center, radius, 2)
+        pygame.draw.circle(
+            layer,
+            (*color, 45 if bot.state is EnemyState.PATROL else 95),
+            local_center,
+            radius,
+            2,
+        )
         self.screen.blit(layer, (center[0] - diameter // 2, center[1] - diameter // 2))
         if bot.sees_player(self.player, self.blockers, self._line_of_sight):
             pygame.draw.line(
@@ -966,6 +1071,71 @@ class Game:
         pygame.draw.lines(layer, (*RED, 85), False, points[1:], 1)
         self.screen.blit(layer, (0, 0))
 
+    def _draw_objective_markers(self) -> None:
+        """Keep the next action visible on the map without relying on color alone."""
+
+        targets: list[tuple[pygame.Vector2, str, tuple[int, int, int]]] = []
+        if not self.player.has_keycard("blue"):
+            targets.extend(
+                (pygame.Vector2(card.rect.center), "KEY", CYAN)
+                for card in self.keycards
+                if card.active
+            )
+        elif not self.terminal_hacked:
+            targets.extend(
+                (pygame.Vector2(terminal.rect.center), "HACK", YELLOW)
+                for terminal in self.terminals
+                if not terminal.hacked
+            )
+        elif not self.boss_defeated:
+            targets.extend(
+                (pygame.Vector2(boss.rect.center), "EMP", RED)
+                for boss in self.bosses
+                if not boss.defeated
+            )
+        else:
+            targets.append((pygame.Vector2(self.exit.rect.center), "EXIT", GREEN))
+
+        if self.difficulty.name == "EXPLORER" and self.player.has_keycard():
+            targets.extend(
+                (pygame.Vector2(door.rect.center), "OPEN", CYAN)
+                for door in self.doors
+                if not door.is_open
+            )
+
+        pulse = math.sin(self._animation_time * 4.0)
+        for position, label, color in targets:
+            center = position + self.map_offset
+            point = (round(center.x), round(center.y))
+            radius = (36 if label == "EMP" else 25) + round(2 * pulse)
+            pygame.draw.circle(self.screen, color, point, radius, 2)
+            marker = pygame.Rect(0, 0, 52, 19)
+            marker.midbottom = (point[0], point[1] - radius - 4)
+            pygame.draw.rect(self.screen, (4, 16, 26), marker, border_radius=4)
+            pygame.draw.rect(self.screen, color, marker, 1, border_radius=4)
+            self.ui.text(
+                self.screen,
+                label,
+                marker.center,
+                size=11,
+                color=color,
+                bold=True,
+                anchor="center",
+            )
+
+        for item, color in (
+            *((battery, GREEN) for battery in self.batteries if battery.active),
+            *((charge, CYAN) for charge in self.emp_pickups if charge.active),
+        ):
+            center = pygame.Vector2(item.rect.center) + self.map_offset
+            pygame.draw.circle(
+                self.screen,
+                color,
+                (round(center.x), round(center.y)),
+                19 + round(pulse),
+                1,
+            )
+
     def _draw_world(self) -> None:
         map_rect = pygame.Rect(
             round(self.map_offset.x),
@@ -991,10 +1161,17 @@ class Game:
             for x in range(rect.left - 8, rect.right + 8, 12):
                 pygame.draw.line(self.screen, YELLOW, (x, rect.bottom + 4), (x + 7, rect.bottom + 4), 3)
 
-        for camera in self.cameras:
-            self._draw_camera_cone(camera)
-        for bot in (*self.enemies, *self.hunters, *self.bosses):
-            self._draw_security_field(bot)
+        old_clip = self.screen.get_clip()
+        self.screen.set_clip(map_rect)
+        try:
+            for camera in self.cameras:
+                self._draw_camera_cone(camera)
+            for bot in (*self.enemies, *self.hunters, *self.bosses):
+                self._draw_security_field(bot)
+        finally:
+            self.screen.set_clip(old_clip)
+
+        self._draw_objective_markers()
         for door in self.doors:
             name = "door_open.png" if door.is_open else "door_locked.png"
             self._blit_world_center(self.assets.get(name, settings.TILE_SIZE), door.rect.center)
@@ -1073,6 +1250,15 @@ class Game:
         self._blit_world_center(
             self.assets.get(player_name + ".png", (44, 44)), self.player.rect.center
         )
+        if self.contact_grace_remaining > 0.0:
+            point = self.player.position + self.map_offset
+            pygame.draw.circle(
+                self.screen,
+                YELLOW,
+                (round(point.x), round(point.y)),
+                26 + round(2 * math.sin(self._animation_time * 9.0)),
+                3,
+            )
 
         if self.emp_effect_remaining > 0.0:
             progress = 1.0 - self.emp_effect_remaining / settings.EMP_EFFECT_SECONDS
@@ -1086,38 +1272,44 @@ class Game:
     def _draw(self) -> None:
         self._draw_background()
         self._draw_world()
-        state = self.security_state_name
-        prompt = self._prompt_for(self._interaction_target()) if self.scene is Scene.PLAYING else ""
-        self.ui.draw_hud(
-            self.screen,
-            battery=self.player.battery,
-            max_battery=self.player.max_battery,
-            has_keycard=self.player.has_keycard(),
-            security_state=state,
-            objective=self.objective,
-            elapsed=self.elapsed,
-            prompt=prompt,
-            emp_charges=self.player.emp_charges,
-            alarm_level=self.alarm_level,
-            level_label=MISSION_STORIES[self.level_index].lab_label,
-            terminal_hacked=self.terminal_hacked if self.terminals else None,
-            terminal_progress=(
-                sum(terminal.hacked for terminal in self.terminals),
-                len(self.terminals),
+        if self.scene in (Scene.PLAYING, Scene.HACKING, Scene.PAUSED):
+            state = self.security_state_name
+            prompt = (
+                self._prompt_for(self._interaction_target())
+                if self.scene is Scene.PLAYING
+                else ""
             )
-            if self.terminals
-            else None,
-            boss_name="WARDEN PRIME" if self.boss is not None else None,
-            boss_health=self.boss.health if self.boss is not None else 0,
-            boss_max_health=self.boss.max_health if self.boss is not None else 0,
-            boss_shielded=bool(self.boss is not None and not self.terminal_hacked),
-            boss_defeated=bool(self.boss is not None and self.boss.defeated),
-            dash_active=self.dash_active,
-        )
+            self.ui.draw_hud(
+                self.screen,
+                battery=self.player.battery,
+                max_battery=self.player.max_battery,
+                has_keycard=self.player.has_keycard(),
+                security_state=state,
+                objective=self.objective,
+                elapsed=self.elapsed,
+                prompt=prompt,
+                emp_charges=self.player.emp_charges,
+                alarm_level=self.alarm_level,
+                level_label=MISSION_STORIES[self.level_index].lab_label,
+                terminal_hacked=self.terminal_hacked if self.terminals else None,
+                terminal_progress=(
+                    sum(terminal.hacked for terminal in self.terminals),
+                    len(self.terminals),
+                )
+                if self.terminals
+                else None,
+                boss_name="WARDEN PRIME" if self.boss is not None else None,
+                boss_health=self.boss.health if self.boss is not None else 0,
+                boss_max_health=self.boss.max_health if self.boss is not None else 0,
+                boss_shielded=bool(self.boss is not None and not self.terminal_hacked),
+                boss_defeated=bool(self.boss is not None and self.boss.defeated),
+                dash_active=self.dash_active,
+                difficulty_label=self.difficulty.name,
+            )
 
         pulse = (math.sin(self._animation_time * 3.0) + 1.0) * 0.5
         if self.scene is Scene.MENU:
-            self.ui.draw_title(self.screen, pulse)
+            self.ui.draw_title(self.screen, pulse, self.difficulty.name)
         elif self.scene is Scene.BRIEFING:
             self.ui.draw_briefing(
                 self.screen,
@@ -1129,8 +1321,13 @@ class Game:
             self.ui.draw_overlay(
                 self.screen,
                 "MISSION PAUSED",
-                "RX-01 is holding position.",
-                ("ESC  Resume", "R  Restart mission", "Q  Quit to desktop"),
+                "Take a moment. Security and battery are paused.",
+                (
+                    "WASD / ARROWS  Move       E  Interact",
+                    "SPACE  EMP              SHIFT  Dash",
+                    "Follow the labeled rings to your next objective.",
+                    "ESC / H  Resume    M  Menu    R  Restart    Q  Quit",
+                ),
                 color=CYAN,
             )
         elif self.scene is Scene.WON:

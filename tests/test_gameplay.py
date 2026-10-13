@@ -128,7 +128,7 @@ class GameplayTests(unittest.TestCase):
         player.battery = 40.0
         self.assertTrue(battery.interact(player))
         self.assertFalse(battery.active)
-        self.assertEqual(player.battery, 40.0 + settings.BATTERY_PICKUP_AMOUNT)
+        self.assertEqual(player.battery, 40.0 + self.game.difficulty.battery_pickup)
 
     def test_security_state_cycle_is_reachable(self) -> None:
         game = self.game

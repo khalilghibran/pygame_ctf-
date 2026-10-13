@@ -219,11 +219,20 @@ class Terminal:
         *,
         sequence: Sequence[str | int] | None = None,
         rng: random.Random | None = None,
+        length: int | None = None,
+        reveal_duration: float | None = None,
+        max_attempts: int | None = None,
     ) -> HackingPuzzle | None:
         if self.hacked or not self.authorized(player):
             return None
         if self.puzzle is None or self.puzzle.failed:
-            self.puzzle = HackingPuzzle(sequence, rng=rng)
+            self.puzzle = HackingPuzzle(
+                sequence,
+                rng=rng,
+                length=HACK_LENGTH if length is None else length,
+                reveal_duration=HACK_REVEAL if reveal_duration is None else reveal_duration,
+                max_attempts=HACK_ATTEMPTS if max_attempts is None else max_attempts,
+            )
         return self.puzzle
 
     interact = begin_hack

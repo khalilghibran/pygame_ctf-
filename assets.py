@@ -121,9 +121,13 @@ class SpriteLibrary:
             direction = next((d for d in ("down", "up", "left", "right") if d in lower), "down")
             return self.cctv(direction, False, size)
         if lower.startswith("floor_"):
-            return self.floor_tile(abs(hash(lower)) % 4, size)
+            variants = {"floor_clean.png": 0, "floor_dark.png": 1, "floor_panel.png": 2}
+            variant = variants.get(lower, sum((index + 1) * ord(char) for index, char in enumerate(lower)) % 4)
+            return self.floor_tile(variant, size)
         if lower.startswith("wall_"):
-            return self.wall_tile(abs(hash(lower)) % 3, size)
+            variants = {"wall_top.png": 0, "wall_side.png": 1, "wall_corner.png": 2}
+            variant = variants.get(lower, sum((index + 1) * ord(char) for index, char in enumerate(lower)) % 3)
+            return self.wall_tile(variant, size)
         if lower in {"door_open.png", "door_closed.png", "door_locked.png"}:
             return self.door("open" in lower, "locked" in lower, size)
         if lower in {"exit_door.png", "elevator.png"}:
@@ -145,14 +149,21 @@ class SpriteLibrary:
     ) -> pygame.Surface:
         dimensions = self._size(size)
         surface = pygame.Surface(dimensions, pygame.SRCALPHA)
-        base = 27 + (variant % 3) * 3
+        width, height = dimensions
+        base = (30, 25, 29, 27)[variant % 4]
         surface.fill((base, base + 10, base + 20))
-        pygame.draw.line(surface, (55, 70, 84), (0, 0), (dimensions[0], 0), 1)
-        pygame.draw.line(surface, (14, 26, 38), (0, dimensions[1] - 1), (dimensions[0], dimensions[1] - 1), 2)
-        pygame.draw.line(surface, (14, 26, 38), (dimensions[0] - 1, 0), (dimensions[0] - 1, dimensions[1]), 1)
+        pygame.draw.line(surface, (53, 70, 83), (0, 0), (width - 1, 0), 1)
+        pygame.draw.line(surface, (14, 26, 38), (0, height - 1), (width - 1, height - 1), 2)
+        pygame.draw.line(surface, (14, 26, 38), (width - 1, 0), (width - 1, height - 1), 1)
         if variant % 4 == 0:
-            for point in ((7, 7), (dimensions[0] - 7, dimensions[1] - 7)):
+            for point in ((7, 7), (width - 7, height - 7)):
                 pygame.draw.circle(surface, (83, 98, 109), point, 2)
+        elif variant % 4 == 1 and width >= 24 and height >= 24:
+            pygame.draw.line(surface, (35, 52, 67), (width // 2 - 8, height // 2), (width // 2 + 8, height // 2), 2)
+        elif variant % 4 == 2 and width >= 24 and height >= 24:
+            panel = pygame.Rect(9, 9, width - 18, height - 18)
+            pygame.draw.rect(surface, (46, 63, 76), panel, 1, border_radius=3)
+            pygame.draw.line(surface, (39, 57, 70), (panel.x + 4, panel.y + 5), (panel.right - 4, panel.y + 5), 1)
         return surface
 
     def wall_tile(
@@ -166,8 +177,14 @@ class SpriteLibrary:
         inner = rect.inflate(-8, -8)
         pygame.draw.rect(surface, (27, 41, 55), inner, border_radius=3)
         pygame.draw.line(surface, (100, 120, 136), inner.topleft, inner.topright, 2)
+        pygame.draw.line(surface, (39, 58, 73), inner.bottomleft, inner.bottomright, 2)
         seam_x = dimensions[0] // 2 + (variant - 1) * 3
         pygame.draw.line(surface, (18, 29, 40), (seam_x, 6), (seam_x, dimensions[1] - 6), 1)
+        if variant % 3 == 1:
+            pygame.draw.line(surface, (64, 84, 100), (8, 12), (8, dimensions[1] - 12), 2)
+        elif variant % 3 == 2:
+            pygame.draw.line(surface, (94, 112, 127), (9, 10), (18, 10), 2)
+            pygame.draw.line(surface, (94, 112, 127), (9, 10), (9, 19), 2)
         pygame.draw.circle(surface, (126, 140, 150), (7, 7), 2)
         pygame.draw.circle(surface, (16, 26, 36), (dimensions[0] - 7, dimensions[1] - 7), 2)
         return surface
